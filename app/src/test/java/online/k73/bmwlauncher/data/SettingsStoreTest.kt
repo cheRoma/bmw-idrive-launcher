@@ -1,5 +1,6 @@
 package online.k73.bmwlauncher.data
 
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -28,5 +29,11 @@ class SettingsStoreTest {
     @Test fun persists_ibus_package() = runTest {
         store.setIBusPackage("de.example.ibus")
         assertEquals("de.example.ibus", store.read().iBusPackage)
+    }
+
+    @Test fun falls_back_to_default_on_corrupt_theme_value() = runTest {
+        // Write a bogus raw value under the same key SettingsStore reads, bypassing setThemeMode.
+        store.editRaw { it[stringPreferencesKey("theme_mode")] = "PURPLE" }
+        assertEquals(ThemeMode.AUTO, store.read().themeMode)
     }
 }

@@ -46,12 +46,17 @@ class SettingsStore(private val context: Context) {
         context.dataStore.edit(block)
     }
 
+    // Test-only: write raw preference values (e.g. a corrupt theme string) through the
+    // same DataStore instance the store reads from, without going via typed setters.
+    internal suspend fun editRaw(block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) =
+        edit(block)
+
     private fun Preferences.toSettings(): LauncherSettings {
         val defaults = LauncherSettings()
         return LauncherSettings(
             autostartIBus = this[Keys.autostart] ?: defaults.autostartIBus,
             bringLauncherToFront = this[Keys.bringToFront] ?: defaults.bringLauncherToFront,
-            themeMode = this[Keys.themeMode]?.let { ThemeMode.valueOf(it) } ?: defaults.themeMode,
+            themeMode = this[Keys.themeMode]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: defaults.themeMode,
             musicPackage = this[Keys.musicPkg] ?: defaults.musicPackage,
             navPackage = this[Keys.navPkg] ?: defaults.navPackage,
             iBusPackage = this[Keys.ibusPkg] ?: defaults.iBusPackage,
