@@ -28,6 +28,16 @@ android {
     testOptions { unitTests.isIncludeAndroidResources = true }
 }
 
+// Paparazzi 1.3.3 bundles com.android.tools:common:31.2.2, whose ResourceType calls
+// Guava's Sets.toImmutableEnumSet(). Guava 33.0.0-jre (dragged in transitively) changed the
+// visibility of that method, producing an IllegalAccessError at layoutlib init time. Pin Guava
+// to the version common:31.2.2 was compiled against so the call resolves at runtime.
+configurations.configureEach {
+    resolutionStrategy {
+        force("com.google.guava:guava:32.0.1-jre")
+    }
+}
+
 dependencies {
     implementation(libs.core.ktx)
     implementation(libs.lifecycle.runtime)
