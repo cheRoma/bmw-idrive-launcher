@@ -1,0 +1,4 @@
+# Separate project (WDS электросхемы PWA), not part of the launcher
+e53/
+# Local Claude Code config
+.claude/
