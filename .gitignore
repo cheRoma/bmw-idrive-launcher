@@ -2,3 +2,10 @@
 e53/
 # Local Claude Code config
 .claude/
+
+# Gradle / Android build
+.gradle/
+build/
+app/build/
+local.properties
+*.hprof
