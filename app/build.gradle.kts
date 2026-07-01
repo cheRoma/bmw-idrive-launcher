@@ -37,6 +37,7 @@ dependencies {
     implementation(libs.compose.graphics)
     implementation(libs.compose.tooling.preview)
     implementation(libs.compose.material3)
+    implementation(libs.compose.material.icons.extended)
     implementation(libs.nav.compose)
     implementation(libs.datastore.prefs)
     implementation(libs.coroutines.android)
