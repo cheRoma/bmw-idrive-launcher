@@ -45,8 +45,11 @@ fun TileCell(tile: Tile, modifier: Modifier = Modifier, onClick: () -> Unit) {
         Text(
             text = tile.label,
             color = c.text,
-            fontSize = if (tile.priority) 26.sp else 24.sp,
+            fontSize = if (tile.priority) 22.sp else 20.sp,
             fontWeight = FontWeight.Medium,
+            maxLines = 2,
+            softWrap = true,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
         )
         androidx.compose.foundation.layout.Box(
             Modifier.fillMaxWidth().height(3.dp)

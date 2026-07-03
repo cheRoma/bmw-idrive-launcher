@@ -11,8 +11,9 @@ val NightTile = Color(0xFF161616)
 val NightText = Color(0xFFC8C8C8)
 val NightTextDim = Color(0xFF8A8A8A)
 
-// Day palette (higher brightness/contrast)
-val DayBackground = Color(0xFF141414)
-val DayTile = Color(0xFF232323)
-val DayText = Color(0xFFF2F2F2)
-val DayTextDim = Color(0xFFB5B5B5)
+// Day palette — still dark (premium night-calm look), only slightly lifted vs night so it
+// is never a washed-out light theme on the car LCD.
+val DayBackground = Color(0xFF0F0F0F)
+val DayTile = Color(0xFF1C1C1C)
+val DayText = Color(0xFFE6E6E6)
+val DayTextDim = Color(0xFF9A9A9A)
