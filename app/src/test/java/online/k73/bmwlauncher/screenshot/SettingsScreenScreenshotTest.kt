@@ -27,7 +27,14 @@ class SettingsScreenScreenshotTest {
     @Test fun settings_night() {
         paparazzi.snapshot {
             BmwLauncherTheme(isNight = true) {
-                SettingsScreen(LauncherSettings(), {}, {}, {})
+                SettingsScreen(
+                    LauncherSettings(), {}, {}, {},
+                    currentVersion = "1.0.1",
+                    hasRoot = false,
+                    updateState = online.k73.bmwlauncher.update.UpdateUiState.Idle,
+                    onCheckUpdate = {},
+                    onInstallUpdate = {},
+                )
             }
         }
     }
