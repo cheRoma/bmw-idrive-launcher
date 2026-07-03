@@ -12,8 +12,8 @@ android {
         applicationId = "online.k73.bmwlauncher"
         minSdk = 26
         targetSdk = 33
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.0.1"
     }
     buildTypes {
         release { isMinifyEnabled = false }
@@ -23,7 +23,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
     composeOptions { kotlinCompilerExtensionVersion = "1.5.14" }
     testOptions { unitTests.isIncludeAndroidResources = true }
 }
