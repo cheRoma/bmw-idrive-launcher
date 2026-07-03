@@ -17,4 +17,9 @@ object ShellCommands {
     // works reliably from a root shell without knowing the exact component name.
     fun startPackage(pkg: String): String =
         "monkey -p $pkg -c android.intent.category.LAUNCHER 1"
+    fun id(): String = "id"
+    // Install over the existing app and immediately relaunch, as ONE su invocation so it
+    // survives our own process being killed during the reinstall.
+    fun installAndRelaunch(apkPath: String, component: String): String =
+        "pm install -r $apkPath && am start -n $component"
 }
