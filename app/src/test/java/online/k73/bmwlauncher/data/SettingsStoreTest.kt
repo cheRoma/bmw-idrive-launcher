@@ -15,14 +15,14 @@ class SettingsStoreTest {
 
     @Test fun reads_defaults_before_any_write() = runTest {
         val s = store.read()
-        assertEquals(ThemeMode.AUTO, s.themeMode)
+        assertEquals(ThemeMode.NIGHT, s.themeMode)
     }
 
     @Test fun persists_theme_mode_and_toggle() = runTest {
-        store.setThemeMode(ThemeMode.NIGHT)
+        store.setThemeMode(ThemeMode.DAY)
         store.setAutostartIBus(false)
         val s = store.read()
-        assertEquals(ThemeMode.NIGHT, s.themeMode)
+        assertEquals(ThemeMode.DAY, s.themeMode)
         assertFalse(s.autostartIBus)
     }
 
@@ -34,6 +34,6 @@ class SettingsStoreTest {
     @Test fun falls_back_to_default_on_corrupt_theme_value() = runTest {
         // Write a bogus raw value under the same key SettingsStore reads, bypassing setThemeMode.
         store.editRaw { it[stringPreferencesKey("theme_mode")] = "PURPLE" }
-        assertEquals(ThemeMode.AUTO, store.read().themeMode)
+        assertEquals(ThemeMode.NIGHT, store.read().themeMode)
     }
 }

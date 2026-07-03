@@ -77,6 +77,25 @@ class HomeActivity : ComponentActivity() {
 
     companion object { const val MANIFEST_URL = "https://k73.online/newBMW/latest.json" }
 
+    /** Hide the system status/navigation bars so the launcher uses the full screen. */
+    private fun enableImmersiveMode() {
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+        androidx.core.view.WindowInsetsControllerCompat(window, window.decorView).apply {
+            hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior =
+                androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // Re-hide the bars whenever we regain focus (they reappear after other apps / dialogs).
+        if (hasFocus) {
+            androidx.core.view.WindowInsetsControllerCompat(window, window.decorView)
+                .hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        }
+    }
+
     private fun launchSystemInstaller(file: java.io.File) {
         val uri: Uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
         val intent = Intent(Intent.ACTION_VIEW).apply {
@@ -121,6 +140,7 @@ class HomeActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableImmersiveMode()
         // Resolve root status ONCE off the main thread; hasRoot() spawns `su` and must never
         // run during composition (blocks the UI thread → ANR on a launcher).
         lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {

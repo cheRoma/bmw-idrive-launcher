@@ -9,7 +9,7 @@ class LauncherSettingsTest {
         val s = LauncherSettings()
         assertTrue(s.autostartIBus)
         assertTrue(s.bringLauncherToFront)
-        assertEquals(ThemeMode.AUTO, s.themeMode)
+        assertEquals(ThemeMode.NIGHT, s.themeMode)
         assertEquals("ru.yandex.yandexnavi", s.navPackage)
         assertEquals("", s.carplayPackage)
     }
