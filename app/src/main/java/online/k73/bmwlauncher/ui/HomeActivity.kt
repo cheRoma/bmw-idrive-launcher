@@ -33,6 +33,17 @@ import online.k73.bmwlauncher.launch.AppLauncher
 import online.k73.bmwlauncher.launch.InstalledApps
 import online.k73.bmwlauncher.system.RootShell
 import online.k73.bmwlauncher.system.ShellCommands
+import androidx.core.content.FileProvider
+import online.k73.bmwlauncher.BuildConfig
+import online.k73.bmwlauncher.update.ApkDownloader
+import online.k73.bmwlauncher.update.ApkInstaller
+import online.k73.bmwlauncher.update.HttpUrlClient
+import online.k73.bmwlauncher.update.InstallResult
+import online.k73.bmwlauncher.update.RootDetector
+import online.k73.bmwlauncher.update.UpdateChecker
+import online.k73.bmwlauncher.update.UpdateStatus
+import online.k73.bmwlauncher.update.UpdateUiState
+import android.net.Uri
 import online.k73.bmwlauncher.theme.ThemeResolver
 import online.k73.bmwlauncher.ui.apps.AppsScreen
 import online.k73.bmwlauncher.ui.home.HomeScreen
@@ -47,6 +58,62 @@ class HomeActivity : ComponentActivity() {
     private val launcher by lazy { AppLauncher(applicationContext) }
     private val shell by lazy { RootShell() }
 
+    private val rootDetector by lazy { RootDetector(shell) }
+    private val updateChecker by lazy { UpdateChecker(HttpUrlClient(), MANIFEST_URL) }
+    private val downloader by lazy { ApkDownloader(HttpUrlClient(), cacheDir) }
+    private val apkInstaller by lazy {
+        ApkInstaller(
+            hasRoot = { rootDetector.hasRoot() },
+            shell = shell,
+            component = "$packageName/.ui.HomeActivity",
+            launchInstaller = { file -> launchSystemInstaller(file) },
+        )
+    }
+    private val updateState = androidx.compose.runtime.mutableStateOf<UpdateUiState>(UpdateUiState.Idle)
+
+    // RootDetector.hasRoot() spawns a `su` process synchronously; never call it during composition.
+    // Resolve it ONCE off the main thread in onCreate and hold the result in this state.
+    private val hasRootState = androidx.compose.runtime.mutableStateOf(false)
+
+    companion object { const val MANIFEST_URL = "https://k73.online/newBMW/latest.json" }
+
+    private fun launchSystemInstaller(file: java.io.File) {
+        val uri: Uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        startActivity(intent)
+    }
+
+    private fun onCheckUpdate() {
+        updateState.value = UpdateUiState.Checking
+        lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val status = updateChecker.fetch(BuildConfig.VERSION_CODE)
+            updateState.value = when (status) {
+                is UpdateStatus.UpToDate -> UpdateUiState.UpToDate
+                is UpdateStatus.Available -> UpdateUiState.Available(status.versionName, status.apkUrl, status.notes)
+                is UpdateStatus.Error -> UpdateUiState.Failed(status.reason)
+            }
+        }
+    }
+
+    private fun onInstallUpdate() {
+        val avail = updateState.value as? UpdateUiState.Available ?: return
+        lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val file = downloader.download(avail.apkUrl) { p -> updateState.value = UpdateUiState.Downloading(p) }
+                updateState.value = UpdateUiState.Installing
+                when (val r = apkInstaller.install(file)) {
+                    is InstallResult.Failed -> updateState.value = UpdateUiState.Failed(r.message)
+                    else -> { /* silent: process restarts; intent: system UI takes over */ }
+                }
+            } catch (t: Throwable) {
+                updateState.value = UpdateUiState.Failed(t.message ?: "download failed")
+            }
+        }
+    }
+
     // Guards against overlapping resumes double-running the autostart check.
     // Reset every time the coroutine finishes, so each wake re-checks i-Bus.
     @Volatile
@@ -54,6 +121,11 @@ class HomeActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Resolve root status ONCE off the main thread; hasRoot() spawns `su` and must never
+        // run during composition (blocks the UI thread → ANR on a launcher).
+        lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            hasRootState.value = rootDetector.hasRoot()
+        }
         val settingsFlow = store.flow.stateIn(lifecycleScope, SharingStarted.Eagerly, LauncherSettings())
         setContent {
             val settings by settingsFlow.collectAsState()
@@ -90,11 +162,18 @@ class HomeActivity : ComponentActivity() {
                         )
                     }
                     composable("settings") {
+                        val update by updateState
+                        val hasRoot by hasRootState
                         SettingsScreen(
                             settings = settings,
                             onAutostart = { lifecycleScope.launch { store.setAutostartIBus(it) } },
                             onBringToFront = { lifecycleScope.launch { store.setBringToFront(it) } },
                             onThemeMode = { lifecycleScope.launch { store.setThemeMode(it) } },
+                            currentVersion = BuildConfig.VERSION_NAME,
+                            hasRoot = hasRoot,
+                            updateState = update,
+                            onCheckUpdate = { onCheckUpdate() },
+                            onInstallUpdate = { onInstallUpdate() },
                         )
                     }
                     // Phase 2 replaces this stub with the real Music screen.
