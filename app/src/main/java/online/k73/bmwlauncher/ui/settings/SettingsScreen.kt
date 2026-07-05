@@ -53,6 +53,7 @@ fun SettingsScreen(
     onInstallUpdate: () -> Unit,
     isDefaultLauncher: Boolean,
     onSetDefault: () -> Unit,
+    onBack: () -> Unit,
 ) {
     val c = LocalLauncherColors.current
     Column(
@@ -62,7 +63,7 @@ fun SettingsScreen(
             .padding(horizontal = 28.dp, vertical = 24.dp)
             .verticalScroll(rememberScrollState()),
     ) {
-        ScreenHeader("Настройки")
+        ScreenHeader("Настройки", onBack)
         Spacer(Modifier.height(12.dp))
 
         SettingRow(title = "Автозапуск Борткомпьютера", subtitle = "Открывать при включении зажигания") {
