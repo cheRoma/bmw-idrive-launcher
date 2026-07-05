@@ -8,12 +8,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Navigation
-import androidx.compose.material.icons.filled.PhoneIphone
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.Cast
+import androidx.compose.material.icons.outlined.Navigation
+import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -21,11 +21,11 @@ import online.k73.bmwlauncher.ui.theme.LocalLauncherColors
 
 val defaultTiles = listOf(
     Tile(TileId.MUSIC, "Музыка", Icons.Filled.MusicNote, priority = true),
-    Tile(TileId.NAV, "Навигация", Icons.Filled.Navigation, priority = true),
-    Tile(TileId.APPS, "Приложения", Icons.Filled.GridView),
-    Tile(TileId.IBUS, "Борткомпьютер", Icons.Filled.DirectionsCar),
-    Tile(TileId.SETTINGS, "Настройки", Icons.Filled.Settings),
-    Tile(TileId.CARPLAY, "CarPlay", Icons.Filled.PhoneIphone),
+    Tile(TileId.NAV, "Навигация", Icons.Outlined.Navigation, priority = true),
+    Tile(TileId.APPS, "Приложения", Icons.Outlined.Apps),
+    Tile(TileId.IBUS, "Борткомпьютер", Icons.Outlined.Speed),
+    Tile(TileId.SETTINGS, "Настройки", Icons.Outlined.Tune),
+    Tile(TileId.CARPLAY, "CarPlay", Icons.Outlined.Cast),
 )
 
 @Composable
