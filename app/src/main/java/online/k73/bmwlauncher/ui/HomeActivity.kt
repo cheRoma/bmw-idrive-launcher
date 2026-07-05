@@ -234,6 +234,7 @@ class HomeActivity : ComponentActivity() {
                             apps = InstalledApps(applicationContext).list(),
                             onLaunch = { launcher.launch(it) },
                             onRebootHold = { rebootDevice() },
+                            onBack = { nav.popBackStack() },
                         )
                     }
                     composable("settings") {
@@ -252,6 +253,7 @@ class HomeActivity : ComponentActivity() {
                             onInstallUpdate = { onInstallUpdate() },
                             isDefaultLauncher = isDefault,
                             onSetDefault = { requestDefaultLauncher() },
+                            onBack = { nav.popBackStack() },
                         )
                     }
                     composable("music") {
@@ -280,6 +282,7 @@ class HomeActivity : ComponentActivity() {
                             onColdStartPlay = {
                                 launcher.launch("ru.yandex.music")
                             },
+                            onBack = { nav.popBackStack() },
                         )
                     }
                 }

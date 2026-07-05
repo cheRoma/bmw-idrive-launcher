@@ -1,6 +1,5 @@
 package online.k73.bmwlauncher.music.ui
 
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -14,6 +13,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -31,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
@@ -51,9 +52,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -63,11 +64,6 @@ import online.k73.bmwlauncher.music.TimeFormat
 import online.k73.bmwlauncher.ui.theme.Inter
 import online.k73.bmwlauncher.ui.theme.LocalLauncherColors
 import online.k73.bmwlauncher.ui.theme.pressScale
-
-// ── Design constants (dp) ────────────────────────────────────────────────────
-private val ENVELOPE = 287.dp
-private val VINYL = 269.dp
-private val LABEL_R = 42.5.dp
 
 @Composable
 fun MusicScreen(
@@ -80,12 +76,15 @@ fun MusicScreen(
     onLike: () -> Unit,
     onPlaylists: () -> Unit,
     onColdStartPlay: () -> Unit,
+    onBack: () -> Unit,
 ) {
     val c = LocalLauncherColors.current
     Column(Modifier.fillMaxSize().background(c.background).padding(horizontal = 32.dp, vertical = 20.dp)) {
-        // Top bar: back chevron only (visual; launcher uses system back). No clock source here.
+        // Top bar: tappable back chevron — returns to the carousel.
         Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("‹", color = c.textDim, fontFamily = Inter, fontSize = 40.sp, fontWeight = FontWeight.Normal)
+            Box(Modifier.size(56.dp).pressScale(onBack), contentAlignment = Alignment.Center) {
+                Text("‹", color = c.textDim, fontFamily = Inter, fontSize = 40.sp, fontWeight = FontWeight.Normal)
+            }
         }
         // subtle amber baseline under the top bar
         Box(
@@ -107,8 +106,15 @@ fun MusicScreen(
 
 @Composable
 private fun Centered(color: Color, text: String, onTap: () -> Unit) {
-    Box(Modifier.fillMaxSize().clickable { onTap() }, contentAlignment = Alignment.Center) {
-        Text(text, color = color, fontFamily = Inter, fontSize = 22.sp)
+    val c = LocalLauncherColors.current
+    Column(
+        Modifier.fillMaxSize().clickable { onTap() },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(Icons.Filled.MusicNote, null, tint = c.textTertiary, modifier = Modifier.size(72.dp))
+        Spacer(Modifier.height(16.dp))
+        Text(text, color = color, fontFamily = Inter, fontSize = 22.sp, textAlign = TextAlign.Center)
     }
 }
 
@@ -119,9 +125,9 @@ private fun PlayingBody(
 ) {
     val c = LocalLauncherColors.current
     Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-        // ── Left: envelope + sliding vinyl ──
-        Column(horizontalAlignment = Alignment.Start) {
-            EnvelopeVinyl(np.isPlaying, art)
+        // ── Left: album art, sized to fit the body height (no fixed width → never overflows) ──
+        Column(horizontalAlignment = Alignment.Start, verticalArrangement = Arrangement.Center) {
+            Envelope(art, Modifier.fillMaxHeight(0.80f).aspectRatio(1f))
             Spacer(Modifier.height(14.dp))
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp)) {
                 Box(Modifier.size(7.dp).clip(CircleShape).background(c.accent))
@@ -129,7 +135,7 @@ private fun PlayingBody(
                 Text("Яндекс Музыка · Моя волна", color = c.textDim, fontFamily = Inter, fontSize = 15.sp)
             }
         }
-        Spacer(Modifier.width(40.dp))
+        Spacer(Modifier.width(32.dp))
         // ── Right column: track info + controls ──
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
             Text(
@@ -148,24 +154,11 @@ private fun PlayingBody(
     }
 }
 
-// ── Envelope + vinyl ─────────────────────────────────────────────────────────
-@Composable
-private fun EnvelopeVinyl(playing: Boolean, art: ImageBitmap?) {
-    // Vinyl centre X (from box left). Playing → slid right so the label fully clears the
-    // envelope; paused → tucked ~30% behind.
-    val centerX by animateDpAsState(if (playing) 340.dp else 214.dp, label = "vinylSlide")
-    Box(Modifier.width(480.dp).height(ENVELOPE)) {
-        // Vinyl (behind)
-        Box(Modifier.align(Alignment.CenterStart).offset(x = centerX - VINYL / 2)) { Vinyl() }
-        // Envelope (in front, pinned left)
-        Envelope(art, Modifier.align(Alignment.CenterStart))
-    }
-}
-
+// ── Album art card ───────────────────────────────────────────────────────────
 @Composable
 private fun Envelope(art: ImageBitmap?, modifier: Modifier = Modifier) {
     val c = LocalLauncherColors.current
-    Box(modifier.size(ENVELOPE).clip(RoundedCornerShape(5.dp)).background(c.tile)) {
+    Box(modifier.clip(RoundedCornerShape(5.dp)).background(c.tile)) {
         if (art != null) {
             Image(art, "Обложка альбома", Modifier.fillMaxSize())
         } else {
@@ -192,47 +185,6 @@ private fun Envelope(art: ImageBitmap?, modifier: Modifier = Modifier) {
         }
         // Dark left spine.
         Box(Modifier.align(Alignment.CenterStart).fillMaxHeight().width(9.dp).background(Color.Black.copy(alpha = 0.28f)))
-    }
-}
-
-@Composable
-private fun Vinyl() {
-    val c = LocalLauncherColors.current
-    val bg = c.background
-    val amber = c.accent
-    Canvas(Modifier.size(VINYL)) {
-        val d = size.minDimension
-        val r = d / 2f
-        val center = Offset(r, r)
-        // Base disc.
-        drawCircle(Color(0xFF0D0E11), r, center)
-        // Concentric grooves.
-        val labelPx = LABEL_R.toPx()
-        val step = 1.7.dp.toPx()
-        var rr = r - step
-        var i = 0
-        while (rr > labelPx) {
-            drawCircle(
-                color = if (i % 2 == 0) Color(0xFF212429) else Color(0xFF16181C),
-                radius = rr, center = center, style = Stroke(width = step),
-            )
-            rr -= step
-            i++
-        }
-        // Soft diagonal sheen across the disc.
-        drawCircle(
-            brush = Brush.linearGradient(
-                colors = listOf(Color.White.copy(alpha = 0.05f), Color.Transparent, Color.White.copy(alpha = 0.03f)),
-                start = Offset(0f, 0f), end = Offset(d, d),
-            ),
-            radius = r, center = center,
-        )
-        // Amber label.
-        drawCircle(amber, labelPx, center)
-        // Cream inner circle.
-        drawCircle(Color(0xFFF2EFE9), 28.dp.toPx(), center)
-        // Spindle hole.
-        drawCircle(bg, 5.5.dp.toPx(), center)
     }
 }
 
@@ -341,7 +293,7 @@ private fun TransportRow(playing: Boolean, onPlayPause: () -> Unit, onNext: () -
 @Composable
 private fun PillRow(np: NowPlaying, onLike: () -> Unit, onPlaylists: () -> Unit) {
     val c = LocalLauncherColors.current
-    Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
         if (np.likeAvailable) {
             // Preserve like toggle: local liked keyed on track + press feedback.
             var liked by remember(np.title, np.artist) { mutableStateOf(false) }
@@ -360,7 +312,7 @@ private fun PillRow(np: NowPlaying, onLike: () -> Unit, onPlaylists: () -> Unit)
                         shape = RoundedCornerShape(999.dp),
                     )
                     .clickable(interactionSource = interaction, indication = null) { liked = !liked; onLike() }
-                    .padding(horizontal = 24.dp),
+                    .padding(horizontal = 18.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
@@ -378,7 +330,7 @@ private fun PillRow(np: NowPlaying, onLike: () -> Unit, onPlaylists: () -> Unit)
                 .clip(RoundedCornerShape(999.dp))
                 .border(1.dp, c.hairline, RoundedCornerShape(999.dp))
                 .pressScale { onPlaylists() }
-                .padding(horizontal = 24.dp),
+                .padding(horizontal = 18.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(Icons.AutoMirrored.Filled.List, "Плейлисты", tint = c.text, modifier = Modifier.size(22.dp))

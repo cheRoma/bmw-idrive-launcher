@@ -1,6 +1,7 @@
 package online.k73.bmwlauncher.ui.theme
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -28,20 +29,26 @@ import androidx.compose.ui.unit.dp
  * amber → transparent gradient divider underneath. Matches the Claude Design mockups (clock-less).
  */
 @Composable
-internal fun ScreenHeader(title: String) {
+internal fun ScreenHeader(title: String, onBack: () -> Unit) {
     val c = LocalLauncherColors.current
     Column(Modifier.fillMaxWidth()) {
         Row(
             Modifier.fillMaxWidth().padding(bottom = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                Icons.Rounded.ChevronLeft,
-                contentDescription = null,
-                tint = c.textDim,
-                modifier = Modifier.size(34.dp),
-            )
-            Spacer(Modifier.width(10.dp))
+            // Comfortable 64dp touch target centered around the visual chevron.
+            Box(
+                Modifier.size(64.dp).pressScale(onBack),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Rounded.ChevronLeft,
+                    contentDescription = "Назад",
+                    tint = c.textDim,
+                    modifier = Modifier.size(34.dp),
+                )
+            }
+            Spacer(Modifier.width(2.dp))
             Text(
                 title,
                 color = c.text,

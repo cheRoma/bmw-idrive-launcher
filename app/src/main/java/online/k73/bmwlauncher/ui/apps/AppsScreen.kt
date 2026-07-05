@@ -51,12 +51,13 @@ fun AppsScreen(
     apps: List<AppEntry>,
     onLaunch: (String) -> Unit,
     onRebootHold: () -> Unit,
+    onBack: () -> Unit,
 ) {
     val c = LocalLauncherColors.current
     var showReboot by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().background(c.background).padding(horizontal = 28.dp, vertical = 24.dp)) {
-        ScreenHeader("Приложения")
+        ScreenHeader("Приложения", onBack)
         Spacer(Modifier.height(24.dp))
         LazyVerticalGrid(
             columns = GridCells.Fixed(4),
