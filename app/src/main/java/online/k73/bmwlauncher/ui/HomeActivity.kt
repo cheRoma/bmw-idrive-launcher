@@ -4,20 +4,13 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -44,13 +37,17 @@ import online.k73.bmwlauncher.update.UpdateChecker
 import online.k73.bmwlauncher.update.UpdateStatus
 import online.k73.bmwlauncher.update.UpdateUiState
 import android.net.Uri
+import androidx.compose.ui.graphics.asImageBitmap
+import online.k73.bmwlauncher.music.MediaSessionRepository
+import online.k73.bmwlauncher.music.MusicViewModel
+import online.k73.bmwlauncher.music.NotificationAccess
+import online.k73.bmwlauncher.music.ui.MusicScreen
 import online.k73.bmwlauncher.theme.ThemeResolver
 import online.k73.bmwlauncher.ui.apps.AppsScreen
 import online.k73.bmwlauncher.ui.home.HomeScreen
 import online.k73.bmwlauncher.ui.home.TileId
 import online.k73.bmwlauncher.ui.settings.SettingsScreen
 import online.k73.bmwlauncher.ui.theme.BmwLauncherTheme
-import online.k73.bmwlauncher.ui.theme.LocalLauncherColors
 import java.time.LocalTime
 
 class HomeActivity : ComponentActivity() {
@@ -70,6 +67,9 @@ class HomeActivity : ComponentActivity() {
         )
     }
     private val updateState = androidx.compose.runtime.mutableStateOf<UpdateUiState>(UpdateUiState.Idle)
+
+    private val musicRepo by lazy { MediaSessionRepository(applicationContext) }
+    private val musicVm by lazy { MusicViewModel(applicationContext, musicRepo, "ru.yandex.music") }
 
     // RootDetector.hasRoot() spawns a `su` process synchronously; never call it during composition.
     // Resolve it ONCE off the main thread in onCreate and hold the result in this state.
@@ -177,7 +177,7 @@ class HomeActivity : ComponentActivity() {
                     composable("home") {
                         HomeScreen(onTile = { id ->
                             when (id) {
-                                TileId.MUSIC -> nav.navigate("music_stub")
+                                TileId.MUSIC -> nav.navigate("music")
                                 TileId.APPS -> nav.navigate("apps")
                                 TileId.SETTINGS -> nav.navigate("settings")
                                 TileId.NAV -> launcher.launch(settings.navPackage)
@@ -208,8 +208,34 @@ class HomeActivity : ComponentActivity() {
                             onInstallUpdate = { onInstallUpdate() },
                         )
                     }
-                    // Phase 2 replaces this stub with the real Music screen.
-                    composable("music_stub") { MusicPlaceholder() }
+                    composable("music") {
+                        val musicState by musicVm.state.collectAsState()
+                        DisposableEffect(Unit) {
+                            musicVm.start(lifecycleScope)
+                            onDispose { musicVm.stop() }
+                        }
+                        MusicScreen(
+                            state = musicState,
+                            albumArt = musicVm.albumArt()?.asImageBitmap(),
+                            onPlayPause = { musicVm.playPause() },
+                            onNext = { musicVm.next() },
+                            onPrev = { musicVm.prev() },
+                            onSeek = { musicVm.seekTo(it) },
+                            onLike = { musicVm.like() },
+                            onPlaylists = {
+                                // Phase 3 will try MediaBrowser; for now open Yandex Music (also the
+                                // "grant permission" tap target when access is missing).
+                                if (!NotificationAccess.isGranted(applicationContext)) {
+                                    startActivity(NotificationAccess.settingsIntent())
+                                } else {
+                                    launcher.launch("ru.yandex.music")
+                                }
+                            },
+                            onColdStartPlay = {
+                                launcher.launch("ru.yandex.music")
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -236,16 +262,5 @@ class HomeActivity : ComponentActivity() {
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun MusicPlaceholder() {
-    val c = LocalLauncherColors.current
-    Box(
-        Modifier.fillMaxSize().background(c.background),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text("Музыка — скоро", color = c.textDim, fontSize = 24.sp)
     }
 }
