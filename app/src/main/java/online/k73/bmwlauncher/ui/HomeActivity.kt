@@ -98,7 +98,8 @@ class HomeActivity : ComponentActivity() {
         }
         // Fallback: open the system "default apps / home" screen so the user can pick us.
         runCatching { startActivity(Intent(Settings.ACTION_HOME_SETTINGS)) }
-            .onFailure { startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)) }
+            .recoverCatching { startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)) }
+        // If neither settings screen resolves, do nothing rather than crash — this is the HOME app.
     }
 
     companion object {
