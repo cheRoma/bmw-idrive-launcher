@@ -31,6 +31,8 @@ fun SettingsScreen(
     updateState: online.k73.bmwlauncher.update.UpdateUiState,
     onCheckUpdate: () -> Unit,
     onInstallUpdate: () -> Unit,
+    isDefaultLauncher: Boolean,
+    onSetDefault: () -> Unit,
 ) {
     val c = LocalLauncherColors.current
     Column(Modifier.fillMaxSize().background(c.background).padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -47,6 +49,24 @@ fun SettingsScreen(
 
         SwitchRow("Автозапуск Борткомпьютера", "i-Bus App", settings.autostartIBus, onAutostart)
         SwitchRow("Выводить на передний план при запуске", null, settings.bringLauncherToFront, onBringToFront)
+
+        Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Лаунчер по умолчанию", color = c.text, fontSize = 22.sp)
+                Text(
+                    if (isDefaultLauncher) "Активен" else "Сейчас используется другой",
+                    color = c.textDim, fontSize = 16.sp,
+                )
+            }
+            if (!isDefaultLauncher) {
+                Text(
+                    "Сделать основным", color = c.accent, fontSize = 20.sp,
+                    modifier = Modifier.padding(8.dp).clickableNoRipple { onSetDefault() },
+                )
+            } else {
+                Text("✓", color = c.accent, fontSize = 22.sp, modifier = Modifier.padding(8.dp))
+            }
+        }
 
         Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("Тема оформления", color = c.text, fontSize = 22.sp, modifier = Modifier.weight(1f))
