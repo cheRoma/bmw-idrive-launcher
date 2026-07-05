@@ -22,9 +22,9 @@ val DayTextDim = Color(0xFF9A9A9A)
 
 // ── Claude Design tokens (redesign) ─────────────────────────────────────────
 // Night tokens (Claude Design)
-val NightBgBase        = Color(0xFF141619)
-val NightSurface       = Color(0xFF1F2329)
-val NightSurfaceHi     = Color(0xFF262B31)
+val NightBgBase        = Color(0xFF0A0B0D)
+val NightSurface       = Color(0xFF15181B)
+val NightSurfaceHi     = Color(0xFF1E2226)
 val NightTextPrimary   = Color(0xFFC7CCD2)
 val NightTextSecondary = Color(0xFF8A9199)
 val NightTextTertiary  = Color(0xFF6B7178)
