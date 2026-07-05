@@ -34,7 +34,16 @@ fun SettingsScreen(
 ) {
     val c = LocalLauncherColors.current
     Column(Modifier.fillMaxSize().background(c.background).padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Настройки", color = c.text, fontSize = 26.sp, modifier = Modifier.padding(bottom = 12.dp))
+        Text("Настройки", color = c.text, fontSize = 26.sp, modifier = Modifier.padding(bottom = 4.dp))
+
+        run {
+            val cfg = androidx.compose.ui.platform.LocalConfiguration.current
+            val dm = androidx.compose.ui.platform.LocalContext.current.resources.displayMetrics
+            Text(
+                "Экран: ${dm.widthPixels}×${dm.heightPixels} px · ${cfg.densityDpi} dpi · ${cfg.screenWidthDp}×${cfg.screenHeightDp} dp",
+                color = c.textDim, fontSize = 15.sp, modifier = Modifier.padding(bottom = 12.dp),
+            )
+        }
 
         SwitchRow("Автозапуск Борткомпьютера", "i-Bus App", settings.autostartIBus, onAutostart)
         SwitchRow("Выводить на передний план при запуске", null, settings.bringLauncherToFront, onBringToFront)
