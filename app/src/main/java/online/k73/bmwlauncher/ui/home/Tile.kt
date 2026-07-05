@@ -1,6 +1,7 @@
 package online.k73.bmwlauncher.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -31,7 +32,12 @@ fun TileCell(tile: Tile, modifier: Modifier = Modifier, onClick: () -> Unit) {
         modifier = modifier
             .aspectRatio(1.6f)
             .clip(RoundedCornerShape(14.dp))
-            .background(c.tile)
+            .background(c.background)
+            .border(
+                width = if (tile.priority) 2.dp else 1.dp,
+                color = if (tile.priority) c.accent else online.k73.bmwlauncher.ui.theme.TileBorder,
+                shape = RoundedCornerShape(14.dp),
+            )
             .clickable { onClick() }
             .padding(20.dp),
         verticalArrangement = Arrangement.SpaceBetween,
@@ -39,8 +45,8 @@ fun TileCell(tile: Tile, modifier: Modifier = Modifier, onClick: () -> Unit) {
         androidx.compose.material3.Icon(
             imageVector = tile.icon,
             contentDescription = tile.label,
-            tint = c.text,
-            modifier = Modifier.height(if (tile.priority) 64.dp else 56.dp),
+            tint = if (tile.priority) c.accent else c.text,
+            modifier = Modifier.height(if (tile.priority) 56.dp else 48.dp),
         )
         Text(
             text = tile.label,
@@ -50,10 +56,6 @@ fun TileCell(tile: Tile, modifier: Modifier = Modifier, onClick: () -> Unit) {
             maxLines = 2,
             softWrap = true,
             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-        )
-        androidx.compose.foundation.layout.Box(
-            Modifier.fillMaxWidth().height(3.dp)
-                .background(if (tile.priority) c.accent else c.tile)
         )
     }
 }

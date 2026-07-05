@@ -5,11 +5,13 @@ import androidx.compose.ui.graphics.Color
 // BMW instrument-illumination amber (verified RGB 255,126,0)
 val BmwAmber = Color(0xFFFF7E00)
 
-// Night-calm palette (default)
-val NightBackground = Color(0xFF0D0D0D)
-val NightTile = Color(0xFF161616)
-val NightText = Color(0xFFC8C8C8)
+// Night-calm palette (default). Pure black base so nothing lifts to grey on the car LCD;
+// tiles are defined by a border, not a lighter fill (see TileCell).
+val NightBackground = Color(0xFF000000)
+val NightTile = Color(0xFF0E0E0E)
+val NightText = Color(0xFFD0D0D0)
 val NightTextDim = Color(0xFF8A8A8A)
+val TileBorder = Color(0xFF2E2E2E)
 
 // Day palette — still dark (premium night-calm look), only slightly lifted vs night so it
 // is never a washed-out light theme on the car LCD.
