@@ -1,7 +1,10 @@
 package online.k73.bmwlauncher.ui
 
+import android.app.role.RoleManager
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.DisposableEffect
@@ -74,6 +77,29 @@ class HomeActivity : ComponentActivity() {
     // RootDetector.hasRoot() spawns a `su` process synchronously; never call it during composition.
     // Resolve it ONCE off the main thread in onCreate and hold the result in this state.
     private val hasRootState = androidx.compose.runtime.mutableStateOf(false)
+
+    // Whether this launcher is the current default HOME. Resolved in onCreate and refreshed in
+    // onResume (so it updates after the user returns from the system role/default-apps dialog).
+    private val isDefaultLauncherState = androidx.compose.runtime.mutableStateOf(false)
+
+    private fun computeIsDefaultLauncher(): Boolean {
+        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        val res = packageManager.resolveActivity(intent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)
+        return res?.activityInfo?.packageName == packageName
+    }
+
+    private fun requestDefaultLauncher() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val rm = getSystemService(RoleManager::class.java)
+            if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_HOME) && !rm.isRoleHeld(RoleManager.ROLE_HOME)) {
+                startActivity(rm.createRequestRoleIntent(RoleManager.ROLE_HOME))
+                return
+            }
+        }
+        // Fallback: open the system "default apps / home" screen so the user can pick us.
+        runCatching { startActivity(Intent(Settings.ACTION_HOME_SETTINGS)) }
+            .onFailure { startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)) }
+    }
 
     companion object {
         const val MANIFEST_URL = "https://k73.online/newBMW/latest.json"
@@ -160,6 +186,8 @@ class HomeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableImmersiveMode()
+        // Resolve default-launcher status once up front so the first Settings visit is correct.
+        isDefaultLauncherState.value = computeIsDefaultLauncher()
         // Resolve root status ONCE off the main thread; hasRoot() spawns `su` and must never
         // run during composition (blocks the UI thread → ANR on a launcher).
         lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
@@ -209,6 +237,7 @@ class HomeActivity : ComponentActivity() {
                     composable("settings") {
                         val update by updateState
                         val hasRoot by hasRootState
+                        val isDefault by isDefaultLauncherState
                         SettingsScreen(
                             settings = settings,
                             onAutostart = { lifecycleScope.launch { store.setAutostartIBus(it) } },
@@ -219,6 +248,8 @@ class HomeActivity : ComponentActivity() {
                             updateState = update,
                             onCheckUpdate = { onCheckUpdate() },
                             onInstallUpdate = { onInstallUpdate() },
+                            isDefaultLauncher = isDefault,
+                            onSetDefault = { requestDefaultLauncher() },
                         )
                     }
                     composable("music") {
@@ -256,6 +287,9 @@ class HomeActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Refresh default-launcher status every resume (e.g. after returning from the system dialog).
+        // Must run before the autostart early-return so it always updates.
+        isDefaultLauncherState.value = computeIsDefaultLauncher()
         // Autostart i-Bus once per process (after boot, when we first become HOME). This ROM has
         // no root, so we launch i-Bus with a normal startActivity (allowed — we are the foreground
         // HOME), then bring our launcher back to the front. Once-per-process so returning Home
