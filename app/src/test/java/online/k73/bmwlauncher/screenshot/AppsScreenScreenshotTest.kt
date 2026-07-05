@@ -32,7 +32,7 @@ class AppsScreenScreenshotTest {
         )
         paparazzi.snapshot {
             BmwLauncherTheme(isNight = true) {
-                AppsScreen(apps = apps, onLaunch = {}, onRebootHold = {})
+                AppsScreen(apps = apps, onLaunch = {}, onRebootHold = {}, onBack = {})
             }
         }
     }

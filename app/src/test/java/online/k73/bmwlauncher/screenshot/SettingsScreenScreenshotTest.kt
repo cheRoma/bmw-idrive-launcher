@@ -36,6 +36,7 @@ class SettingsScreenScreenshotTest {
                     onInstallUpdate = {},
                     isDefaultLauncher = false,
                     onSetDefault = {},
+                    onBack = {},
                 )
             }
         }
