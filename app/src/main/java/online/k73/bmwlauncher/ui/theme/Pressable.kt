@@ -15,15 +15,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 
-/** Full tile press feedback: scale 0.97 + amber border 1→2dp + fill surface→surfaceHi. [focused] forces the amber-2dp highlighted look. */
+/** Full tile press feedback: scale 0.94 + haptic pulse + amber border 1→2dp + fill surface→surfaceHi. [focused] forces the amber-2dp highlighted look. */
 @Composable
 fun Modifier.pressable(shape: Shape, focused: Boolean = false, onClick: () -> Unit): Modifier {
     val c = LocalLauncherColors.current
+    val haptics = LocalHapticFeedback.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) 0.97f else 1f, animationSpec = if (pressed) tween(90) else spring(0.6f, 500f), label = "pressScale")
+    val scale by animateFloatAsState(if (pressed) 0.94f else 1f, animationSpec = if (pressed) tween(90) else spring(0.6f, 500f), label = "pressScale")
     val fill = if (pressed || focused) c.surfaceHi else c.tile
     val borderW = if (focused) 2.dp else if (pressed) 2.dp else 1.dp
     val borderC = if (focused || pressed) c.accent else c.hairline
@@ -32,14 +35,21 @@ fun Modifier.pressable(shape: Shape, focused: Boolean = false, onClick: () -> Un
         .clip(shape)
         .background(fill, shape)
         .border(borderW, borderC, shape)
-        .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+        .clickable(interactionSource = interaction, indication = null) {
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            onClick()
+        }
 }
 
-/** Lighter feedback for icon-only controls: just the 0.97 press scale, no fill/border. */
+/** Lighter feedback for icon-only controls: 0.94 press scale + haptic pulse, no fill/border. */
 @Composable
 fun Modifier.pressScale(onClick: () -> Unit): Modifier {
+    val haptics = LocalHapticFeedback.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) 0.97f else 1f, animationSpec = if (pressed) tween(90) else spring(0.6f, 500f), label = "pressScaleIcon")
-    return this.scale(scale).clickable(interactionSource = interaction, indication = null, onClick = onClick)
+    val scale by animateFloatAsState(if (pressed) 0.94f else 1f, animationSpec = if (pressed) tween(90) else spring(0.6f, 500f), label = "pressScaleIcon")
+    return this.scale(scale).clickable(interactionSource = interaction, indication = null) {
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        onClick()
+    }
 }

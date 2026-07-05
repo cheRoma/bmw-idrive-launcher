@@ -3,6 +3,7 @@ package online.k73.bmwlauncher.ui.home
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -29,12 +30,12 @@ import java.time.LocalDateTime
 import kotlin.math.absoluteValue
 
 // ── Carousel geometry (Claude Design, screen_2a / screen_1j) ─────────────────
-// The focus tile is a 203dp square (radius 18dp). Neighbours scale down via CarouselGeometry.
-// Page slots are narrower than the card (179dp centre-to-centre), so cards overlap and the side
+// The focus tile is a 264dp square (radius 18dp). Neighbours scale down via CarouselGeometry.
+// Page slots are narrower than the card (233dp centre-to-centre), so cards overlap and the side
 // tiles bleed off both edges the way the mockup shows.
-private val FocusCardSize = 203.dp
-private val PageWidth = 179.dp
-private val GlowSize = 320.dp
+private val FocusCardSize = 264.dp
+private val PageWidth = 233.dp
+private val GlowSize = 416.dp
 
 /**
  * Infinitely-looping 3D cylindrical tile carousel (Claude Design home). Tap any tile to open it.
@@ -54,14 +55,16 @@ fun HomeCarousel(
     val startPage = (loops / 2) * tiles.size
     val pagerState = rememberPagerState(initialPage = startPage, pageCount = { loops * tiles.size })
 
-    Box(Modifier.fillMaxSize().background(c.background)) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(c.background)) {
+        // Center the settled tile using the REAL available width (never a hardcoded 1280dp).
+        val sidePadding = (maxWidth - PageWidth) / 2
         AmbientGlow()
         Column(Modifier.fillMaxSize()) {
             StatusRibbon(RibbonClock.time(now), RibbonClock.date(now), temp)
             HorizontalPager(
                 state = pagerState,
                 pageSize = PageSize.Fixed(PageWidth),
-                contentPadding = PaddingValues(horizontal = (1280.dp - PageWidth) / 2),
+                contentPadding = PaddingValues(horizontal = sidePadding),
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 verticalAlignment = Alignment.CenterVertically,
             ) { page ->
