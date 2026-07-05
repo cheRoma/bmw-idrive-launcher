@@ -8,8 +8,9 @@ data class LauncherSettings(
     val themeMode: ThemeMode = ThemeMode.NIGHT,
     val musicPackage: String = "ru.yandex.music",
     val navPackage: String = "ru.yandex.yandexnavi",
-    val iBusPackage: String = "",
-    val carplayPackage: String = "",
+    // Discovered on the real head unit (Microntek/XTRONS, Android 13):
+    val iBusPackage: String = "com.e39.ak.e39ibus.app",
+    val carplayPackage: String = "com.zjinnova.zlink",
     val nightStartHour: Int = 20,
     val nightEndHour: Int = 7,
 )

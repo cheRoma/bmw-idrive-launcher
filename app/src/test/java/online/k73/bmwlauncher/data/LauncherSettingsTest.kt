@@ -11,6 +11,6 @@ class LauncherSettingsTest {
         assertTrue(s.bringLauncherToFront)
         assertEquals(ThemeMode.NIGHT, s.themeMode)
         assertEquals("ru.yandex.yandexnavi", s.navPackage)
-        assertEquals("", s.carplayPackage)
+        assertEquals("com.zjinnova.zlink", s.carplayPackage)
     }
 }

@@ -77,6 +77,19 @@ class HomeActivity : ComponentActivity() {
 
     companion object { const val MANIFEST_URL = "https://k73.online/newBMW/latest.json" }
 
+    /**
+     * Reboot the head unit WITHOUT root. This Microntek/XTRONS ROM (Android 13) has a privileged
+     * service (android.microntek.service, holds android.permission.REBOOT) that reboots on receiving
+     * the "com.microntek.hctreboot" broadcast — confirmed working from an unprivileged app. Falls
+     * back to `su -c reboot` for rooted units (harmless no-op without root).
+     */
+    private fun rebootDevice() {
+        sendBroadcast(Intent("com.microntek.hctreboot"))
+        lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { shell.exec(ShellCommands.reboot()) }
+        }
+    }
+
     /** Hide the system status/navigation bars so the launcher uses the full screen. */
     private fun enableImmersiveMode() {
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -133,10 +146,9 @@ class HomeActivity : ComponentActivity() {
         }
     }
 
-    // Guards against overlapping resumes double-running the autostart check.
-    // Reset every time the coroutine finishes, so each wake re-checks i-Bus.
+    // Autostart i-Bus only once per process (after boot, when we first become HOME).
     @Volatile
-    private var autostartInFlight = false
+    private var autostartHandled = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -178,7 +190,7 @@ class HomeActivity : ComponentActivity() {
                         AppsScreen(
                             apps = InstalledApps(applicationContext).list(),
                             onLaunch = { launcher.launch(it) },
-                            onRebootHold = { shell.exec(ShellCommands.reboot()) },
+                            onRebootHold = { rebootDevice() },
                         )
                     }
                     composable("settings") {
@@ -205,26 +217,23 @@ class HomeActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Autostart runs on EVERY wake (device resume from sleep is the primary trigger).
-        // ensureRunning() early-returns when pidof shows i-Bus alive, so this is cheap and
-        // idempotent. A single in-flight flag prevents overlapping resumes double-running it.
-        if (autostartInFlight) return
-        autostartInFlight = true
+        // Autostart i-Bus once per process (after boot, when we first become HOME). This ROM has
+        // no root, so we launch i-Bus with a normal startActivity (allowed — we are the foreground
+        // HOME), then bring our launcher back to the front. Once-per-process so returning Home
+        // later doesn't relaunch i-Bus.
+        if (autostartHandled) return
+        autostartHandled = true
         lifecycleScope.launch {
-            try {
-                val s = store.read()
-                if (s.autostartIBus && s.iBusPackage.isNotBlank()) {
-                    AutostartController(shell, onLaunched = {
-                        // Re-foreground HOME only during an actual i-Bus launch, and only
-                        // when the user opted into bring-to-front. Not on idle resume.
-                        if (s.bringLauncherToFront) {
-                            startActivity(Intent(this@HomeActivity, HomeActivity::class.java)
-                                .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
-                        }
-                    }).ensureRunning(s.iBusPackage)
+            val s = store.read()
+            if (s.autostartIBus && s.iBusPackage.isNotBlank()) {
+                launcher.launch(s.iBusPackage)
+                if (s.bringLauncherToFront) {
+                    kotlinx.coroutines.delay(1500)
+                    startActivity(
+                        Intent(this@HomeActivity, HomeActivity::class.java)
+                            .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                    )
                 }
-            } finally {
-                autostartInFlight = false
             }
         }
     }
