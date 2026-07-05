@@ -19,8 +19,8 @@ android {
         applicationId = "online.k73.bmwlauncher"
         minSdk = 26
         targetSdk = 33
-        versionCode = 16
-        versionName = "1.4.0"
+        versionCode = 17
+        versionName = "1.4.1"
     }
     signingConfigs {
         create("release") {
