@@ -44,7 +44,7 @@ import online.k73.bmwlauncher.music.NotificationAccess
 import online.k73.bmwlauncher.music.ui.MusicScreen
 import online.k73.bmwlauncher.theme.ThemeResolver
 import online.k73.bmwlauncher.ui.apps.AppsScreen
-import online.k73.bmwlauncher.ui.home.HomeScreen
+import online.k73.bmwlauncher.ui.home.HomeCarousel
 import online.k73.bmwlauncher.ui.home.TileId
 import online.k73.bmwlauncher.ui.settings.SettingsScreen
 import online.k73.bmwlauncher.ui.theme.BmwLauncherTheme
@@ -164,9 +164,11 @@ class HomeActivity : ComponentActivity() {
             // AUTO theme must re-evaluate over time: tick once per minute so the
             // composition recomputes isNight and flips the palette at the boundary.
             var now by remember { mutableStateOf(LocalTime.now()) }
+            var nowDateTime by remember { mutableStateOf(java.time.LocalDateTime.now()) }
             LaunchedEffect(Unit) {
                 while (true) {
                     now = LocalTime.now()
+                    nowDateTime = java.time.LocalDateTime.now()
                     delay(60_000)
                 }
             }
@@ -175,16 +177,20 @@ class HomeActivity : ComponentActivity() {
                 val nav = rememberNavController()
                 NavHost(nav, startDestination = "home") {
                     composable("home") {
-                        HomeScreen(onTile = { id ->
-                            when (id) {
-                                TileId.MUSIC -> nav.navigate("music")
-                                TileId.APPS -> nav.navigate("apps")
-                                TileId.SETTINGS -> nav.navigate("settings")
-                                TileId.NAV -> launcher.launch(settings.navPackage)
-                                TileId.IBUS -> launcher.launch(settings.iBusPackage)
-                                TileId.CARPLAY -> launcher.launch(settings.carplayPackage)
-                            }
-                        })
+                        HomeCarousel(
+                            now = nowDateTime,
+                            temp = null, // wired to the Microntek outside-temp broadcast later
+                            onTile = { id ->
+                                when (id) {
+                                    TileId.MUSIC -> nav.navigate("music")
+                                    TileId.APPS -> nav.navigate("apps")
+                                    TileId.SETTINGS -> nav.navigate("settings")
+                                    TileId.NAV -> launcher.launch(settings.navPackage)
+                                    TileId.IBUS -> launcher.launch(settings.iBusPackage)
+                                    TileId.CARPLAY -> launcher.launch(settings.carplayPackage)
+                                }
+                            },
+                        )
                     }
                     composable("apps") {
                         AppsScreen(
