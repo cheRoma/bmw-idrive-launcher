@@ -9,10 +9,10 @@ class RibbonClockTest {
         assertEquals("19:42", RibbonClock.time(LocalDateTime.of(2026, 7, 5, 19, 42)))
         assertEquals("07:05", RibbonClock.time(LocalDateTime.of(2026, 7, 5, 7, 5)))
     }
-    @Test fun date_is_russian_short_dow_day_month() {
+    @Test fun date_is_full_lowercase_weekday() {
         // 2026-07-05 is a Sunday
-        assertEquals("Вс, 5 июля", RibbonClock.date(LocalDateTime.of(2026, 7, 5, 0, 0)))
+        assertEquals("воскресенье, 5 июля", RibbonClock.date(LocalDateTime.of(2026, 7, 5, 0, 0)))
         // 2026-01-01 is a Thursday
-        assertEquals("Чт, 1 января", RibbonClock.date(LocalDateTime.of(2026, 1, 1, 0, 0)))
+        assertEquals("четверг, 1 января", RibbonClock.date(LocalDateTime.of(2026, 1, 1, 0, 0)))
     }
 }

@@ -5,9 +5,9 @@ import java.time.LocalDateTime
 
 object RibbonClock {
     private val DOW = mapOf(
-        DayOfWeek.MONDAY to "Пн", DayOfWeek.TUESDAY to "Вт", DayOfWeek.WEDNESDAY to "Ср",
-        DayOfWeek.THURSDAY to "Чт", DayOfWeek.FRIDAY to "Пт", DayOfWeek.SATURDAY to "Сб",
-        DayOfWeek.SUNDAY to "Вс",
+        DayOfWeek.MONDAY to "понедельник", DayOfWeek.TUESDAY to "вторник", DayOfWeek.WEDNESDAY to "среда",
+        DayOfWeek.THURSDAY to "четверг", DayOfWeek.FRIDAY to "пятница", DayOfWeek.SATURDAY to "суббота",
+        DayOfWeek.SUNDAY to "воскресенье",
     )
     private val MONTHS = arrayOf(
         "января", "февраля", "марта", "апреля", "мая", "июня",
