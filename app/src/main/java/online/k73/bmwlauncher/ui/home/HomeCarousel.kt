@@ -43,7 +43,7 @@ fun HomeCarousel(
         Column(Modifier.fillMaxSize()) {
             StatusRibbon(RibbonClock.time(now), RibbonClock.date(now), temp)
             BoxWithConstraints(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                val cardWidth = maxWidth * 0.30f
+                val cardWidth = maxWidth * 0.16f
                 val sidePadding = (maxWidth - cardWidth) / 2f
                 HorizontalPager(
                     state = pagerState,
