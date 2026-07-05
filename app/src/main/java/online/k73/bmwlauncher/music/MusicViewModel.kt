@@ -27,15 +27,19 @@ class MusicViewModel(
     private var callback: MediaController.Callback? = null
     private var sessionsListener: android.media.session.MediaSessionManager.OnActiveSessionsChangedListener? = null
 
+    private var tickJob: kotlinx.coroutines.Job? = null
+
     fun start(scope: CoroutineScope) {
+        if (tickJob?.isActive == true) return // already running — don't stack tick loops
         sessionsListener = repo.observeSessions { rebind() }
         rebind()
-        scope.launch {
+        tickJob = scope.launch {
             while (true) { refresh(); delay(1000) }
         }
     }
 
     fun stop() {
+        tickJob?.cancel(); tickJob = null
         callback?.let { rawController?.unregisterCallback(it) }
         sessionsListener?.let { repo.stopObserving(it) }
     }
