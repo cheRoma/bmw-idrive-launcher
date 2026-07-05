@@ -5,7 +5,7 @@ data class TileTransform(
     val rotationYDeg: Float,
     val scale: Float,
     val alpha: Float,
-    val translationXFraction: Float, // fraction of card width, pulls neighbours toward center
+    val translationXFraction: Float, // fraction of card width; horizontal spread applied to side cards
 )
 
 /**
