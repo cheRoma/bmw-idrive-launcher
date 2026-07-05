@@ -89,17 +89,18 @@ class HomeActivity : ComponentActivity() {
     }
 
     private fun requestDefaultLauncher() {
+        // Reliable path on this Microntek ROM (and how other launchers get selected): open the
+        // system "Home app" picker so the user chooses us. The RoleManager ROLE_HOME one-tap dialog
+        // is nicer but does NOT reliably take on this OEM ROM, so it's only a secondary attempt.
+        // All calls guarded — this is the HOME app and must never crash.
+        if (runCatching { startActivity(Intent(Settings.ACTION_HOME_SETTINGS)) }.isSuccess) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val rm = getSystemService(RoleManager::class.java)
             if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_HOME) && !rm.isRoleHeld(RoleManager.ROLE_HOME)) {
-                startActivity(rm.createRequestRoleIntent(RoleManager.ROLE_HOME))
-                return
+                if (runCatching { startActivity(rm.createRequestRoleIntent(RoleManager.ROLE_HOME)) }.isSuccess) return
             }
         }
-        // Fallback: open the system "default apps / home" screen so the user can pick us.
-        runCatching { startActivity(Intent(Settings.ACTION_HOME_SETTINGS)) }
-            .recoverCatching { startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)) }
-        // If neither settings screen resolves, do nothing rather than crash — this is the HOME app.
+        runCatching { startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)) }
     }
 
     companion object {
