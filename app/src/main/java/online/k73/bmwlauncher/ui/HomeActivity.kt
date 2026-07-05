@@ -75,7 +75,14 @@ class HomeActivity : ComponentActivity() {
     // Resolve it ONCE off the main thread in onCreate and hold the result in this state.
     private val hasRootState = androidx.compose.runtime.mutableStateOf(false)
 
-    companion object { const val MANIFEST_URL = "https://k73.online/newBMW/latest.json" }
+    companion object {
+        const val MANIFEST_URL = "https://k73.online/newBMW/latest.json"
+
+        // How long to let i-Bus initialize its I-Bus/USB link before we pull the launcher back to the
+        // front. On non-root stock Android an activity launch is necessarily briefly visible; NO_ANIMATION
+        // + a short settle shrinks the i-Bus flash to a flicker. Raise if i-Bus needs longer to connect.
+        const val IBUS_SETTLE_MS = 300L
+    }
 
     /**
      * Reboot the head unit WITHOUT root. This Microntek/XTRONS ROM (Android 13) has a privileged
@@ -258,13 +265,16 @@ class HomeActivity : ComponentActivity() {
         lifecycleScope.launch {
             val s = store.read()
             if (s.autostartIBus && s.iBusPackage.isNotBlank()) {
-                launcher.launch(s.iBusPackage)
-                if (s.bringLauncherToFront) {
-                    kotlinx.coroutines.delay(1500)
-                    startActivity(
-                        Intent(this@HomeActivity, HomeActivity::class.java)
-                            .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-                    )
+                val ibusIntent = launcher.launchIntentFor(s.iBusPackage)?.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
+                if (ibusIntent != null) {
+                    startActivity(ibusIntent)
+                    if (s.bringLauncherToFront) {
+                        kotlinx.coroutines.delay(IBUS_SETTLE_MS)
+                        startActivity(
+                            Intent(this@HomeActivity, HomeActivity::class.java)
+                                .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_NO_ANIMATION)
+                        )
+                    }
                 }
             }
         }

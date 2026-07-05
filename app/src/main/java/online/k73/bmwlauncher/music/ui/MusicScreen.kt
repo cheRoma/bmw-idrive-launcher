@@ -1,8 +1,13 @@
 package online.k73.bmwlauncher.music.ui
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -28,11 +34,18 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -102,10 +115,39 @@ private fun PlayingBody(
             Spacer(Modifier.height(4.dp))
             Text(np.artist, color = c.textDim, fontSize = 26.sp, maxLines = 1)
             Spacer(Modifier.height(28.dp))
-            // progress
+            // progress (tap-and-drag seek)
             val frac = if (np.durationMs > 0) (np.positionMs.toFloat() / np.durationMs).coerceIn(0f, 1f) else 0f
-            Box(Modifier.fillMaxWidth().height(6.dp).clip(CircleShape).background(c.tile)) {
-                Box(Modifier.fillMaxWidth(frac).height(6.dp).clip(CircleShape).background(c.accent))
+            var dragFrac by remember(np.title, np.artist) { mutableStateOf<Float?>(null) }
+            // If durationMs changes mid-drag, the pointerInput is torn down without onDragCancel;
+            // clear the optimistic fill so it can't stick.
+            LaunchedEffect(np.durationMs) { dragFrac = null }
+            val shownFrac = dragFrac ?: frac
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(30.dp)
+                    .then(
+                        if (np.durationMs > 0) Modifier
+                            .pointerInput(np.durationMs) {
+                                detectTapGestures { pos ->
+                                    onSeek(((pos.x / size.width).coerceIn(0f, 1f) * np.durationMs).toLong())
+                                }
+                            }
+                            .pointerInput(np.durationMs) {
+                                detectHorizontalDragGestures(
+                                    onDragStart = { pos -> dragFrac = (pos.x / size.width).coerceIn(0f, 1f) },
+                                    onHorizontalDrag = { change, _ -> dragFrac = (change.position.x / size.width).coerceIn(0f, 1f) },
+                                    onDragEnd = { dragFrac?.let { onSeek((it * np.durationMs).toLong()) }; dragFrac = null },
+                                    onDragCancel = { dragFrac = null },
+                                )
+                            }
+                        else Modifier
+                    ),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Box(Modifier.fillMaxWidth().height(6.dp).clip(CircleShape).background(c.tile)) {
+                    Box(Modifier.fillMaxWidth(shownFrac).height(6.dp).clip(CircleShape).background(c.accent))
+                }
             }
             Spacer(Modifier.height(6.dp))
             Row(Modifier.fillMaxWidth()) {
@@ -125,8 +167,19 @@ private fun PlayingBody(
                 Icon(Icons.Filled.SkipNext, "next", tint = c.text,
                     modifier = Modifier.size(48.dp).clickable { onNext() })
                 if (np.likeAvailable) {
-                    Icon(Icons.Filled.Favorite, "like", tint = c.accent,
-                        modifier = Modifier.size(44.dp).clickable { onLike() })
+                    var liked by remember(np.title, np.artist) { mutableStateOf(false) }
+                    val interaction = remember { MutableInteractionSource() }
+                    val pressed by interaction.collectIsPressedAsState()
+                    val scale by animateFloatAsState(if (pressed) 0.82f else 1f, label = "likeScale")
+                    Icon(
+                        if (liked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                        contentDescription = "like",
+                        tint = if (liked) c.accent else c.textDim,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .scale(scale)
+                            .clickable(interactionSource = interaction, indication = null) { liked = !liked; onLike() },
+                    )
                 }
             }
         }
