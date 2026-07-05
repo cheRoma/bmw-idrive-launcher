@@ -11,7 +11,7 @@
 ## Design tokens (from HANDOFF.md — authoritative)
 NightColors: bgBase `#141619`, surface `#1F2329`, surfaceHi `#262B31`, textPrimary `#C7CCD2`, textSecondary `#8A9199`, textTertiary `#6B7178`, accentAmber `#FF7E00`, hairline `#1AFFFFFF`, callGreen `#1E7A3C`.
 DayColors (also dark, brighter): bgBase `#1C1F24`, surface `#272C32`, surfaceHi `#2E343B`, textPrimary `#EDEFF2`, textSecondary `#A6ADB5`, accentAmber `#FF8A1A`, hairline `#29FFFFFF`. Day = higher contrast, NO ambient glow/glow-shadows.
-Font: **Archivo** (400/500/600/700), tabular digits (`tnum`). Type sizes (dp): display 31, clock 29, title 20, body 17, label 16, caption 14 (min).
+Font: **Inter** (400/500/600/700), tabular digits (`tnum`). *(Substituted for the handoff's Archivo, which has NO Cyrillic — our UI is Russian. Inter is a clean grotesque with full Cyrillic + tabular figures. Static weights already placed in `app/src/main/res/font/inter_{regular,medium,semibold,bold}.ttf`.)* Type sizes (dp): display 31, clock 29, title 20, body 17, label 16, caption 14 (min).
 Carousel (screen_1j): focus tile **203dp** (radius 18dp = 16+2), side **160dp**, rotY **±26/38/48°**, icon **58dp** focus / **43dp** side, label **20dp**/**15dp**, gap between centres **179dp**, glow `0 0 43dp rgba(255,126,0,0.22)`, row opacity **1 / .55 / .32 / .16**.
 States (triple pressed signal, ALL taps): scale 0.97 (in 90ms easeOut, out 220ms spring(0.6,500)) + border amber 1→2dp + fill surface→surfaceHi. Focused: amber 2dp + glow (night) / amber 2.5dp no glow (day). Disabled: alpha 0.45.
 
