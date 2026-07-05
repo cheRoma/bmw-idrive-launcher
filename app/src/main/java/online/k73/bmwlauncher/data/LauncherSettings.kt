@@ -10,7 +10,8 @@ data class LauncherSettings(
     val navPackage: String = "ru.yandex.yandexnavi",
     // Discovered on the real head unit (Microntek/XTRONS, Android 13):
     val iBusPackage: String = "com.e39.ak.e39ibus.app",
-    val carplayPackage: String = "com.zjinnova.zlink",
+    // CarbitLink (net.easyconn) — the app Roma uses for CarPlay on this unit (label "CarbitLink").
+    val carplayPackage: String = "net.easyconn",
     val nightStartHour: Int = 20,
     val nightEndHour: Int = 7,
 )
