@@ -2,6 +2,7 @@ package online.k73.bmwlauncher.ui.home
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -37,7 +38,7 @@ fun HomeCarousel(
     val startPage = (loops / 2) * tiles.size
     val pagerState = rememberPagerState(initialPage = startPage, pageCount = { loops * tiles.size })
 
-    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(c.background)) {
+    Box(Modifier.fillMaxSize().background(c.background)) {
         AmbientGlow()
         Column(Modifier.fillMaxSize()) {
             StatusRibbon(RibbonClock.time(now), RibbonClock.date(now), temp)
@@ -58,7 +59,7 @@ fun HomeCarousel(
                         center = offset.absoluteValue < 0.5f,
                         modifier = Modifier
                             .width(cardWidth)
-                            .fillMaxHeightSafe()
+                            .fillMaxSize()
                             .graphicsLayer {
                                 rotationY = tf.rotationYDeg
                                 scaleX = tf.scale
@@ -74,5 +75,3 @@ fun HomeCarousel(
         }
     }
 }
-
-private fun Modifier.fillMaxHeightSafe() = this.then(Modifier.fillMaxSize())
