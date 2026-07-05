@@ -34,6 +34,8 @@ class SettingsScreenScreenshotTest {
                     updateState = online.k73.bmwlauncher.update.UpdateUiState.Idle,
                     onCheckUpdate = {},
                     onInstallUpdate = {},
+                    isDefaultLauncher = false,
+                    onSetDefault = {},
                 )
             }
         }
