@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -117,6 +118,9 @@ private fun PlayingBody(
             // progress (tap-and-drag seek)
             val frac = if (np.durationMs > 0) (np.positionMs.toFloat() / np.durationMs).coerceIn(0f, 1f) else 0f
             var dragFrac by remember(np.title, np.artist) { mutableStateOf<Float?>(null) }
+            // If durationMs changes mid-drag, the pointerInput is torn down without onDragCancel;
+            // clear the optimistic fill so it can't stick.
+            LaunchedEffect(np.durationMs) { dragFrac = null }
             val shownFrac = dragFrac ?: frac
             Box(
                 Modifier
