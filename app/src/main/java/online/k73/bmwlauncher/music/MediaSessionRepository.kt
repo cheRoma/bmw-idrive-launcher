@@ -6,6 +6,7 @@ import android.content.Intent
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
+import android.media.session.PlaybackState
 import android.view.KeyEvent
 
 /** Finds the active MediaController for [targetPackage] via our enabled notification listener. */
@@ -16,7 +17,14 @@ class MediaSessionRepository(private val context: Context) {
 
     fun activeController(targetPackage: String): MediaController? =
         runCatching { manager.getActiveSessions(listener) }.getOrNull()
-            ?.firstOrNull { it.packageName == targetPackage }
+            ?.filter { it.packageName == targetPackage }
+            ?.let { list ->
+                // Yandex can expose more than one session (an idle one + the real playing one).
+                // Prefer the session that's actually playing so we don't bind to the empty one.
+                list.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
+                    ?: list.firstOrNull { !(it.playbackState?.state == PlaybackState.STATE_NONE && it.metadata == null) }
+                    ?: list.firstOrNull()
+            }
 
     /**
      * Start playback in [pkg] via a background media-button — wakes the player and creates its

@@ -29,20 +29,17 @@ class MusicViewModel(
     private var sessionsListener: android.media.session.MediaSessionManager.OnActiveSessionsChangedListener? = null
 
     private var tickJob: kotlinx.coroutines.Job? = null
+    private var coldStartPending = false
 
     fun start(scope: CoroutineScope) {
         if (tickJob?.isActive == true) return // already running — don't stack tick loops
-        sessionsListener = repo.observeSessions { rebind() }
-        rebind()
-        // The notification listener can connect a beat after this screen opens; if Yandex's
-        // session already existed by then, the "sessions changed" callback never fires — so poll
-        // a few times to pick it up instead of sitting on an empty screen.
-        scope.launch {
-            var tries = 0
-            while (controller == null && tries < 8) { delay(500); rebind(); tries++ }
-        }
+        sessionsListener = repo.observeSessions { rebind(); refresh() }
+        rebind(); refresh()
+        // Re-pick the active session AND refresh every second. The notification listener can connect
+        // late, and Yandex may swap to a real playing session after it opens — this keeps us bound to
+        // whatever is currently active instead of sitting on a stale/empty session (the "grey screen").
         tickJob = scope.launch {
-            while (true) { refresh(); delay(1000) }
+            while (true) { rebind(); refresh(); delay(1000) }
         }
     }
 
@@ -53,13 +50,14 @@ class MusicViewModel(
      */
     fun startBackgroundPlay(scope: CoroutineScope, fallbackLaunch: (String) -> Unit) {
         AppLog.d("MUSIC", "cold-start: background PLAY -> $targetPackage")
+        coldStartPending = true
         repo.sendPlay(targetPackage)
         scope.launch {
             // Give the media-button a short chance; if Yandex isn't running it won't wake, so fall
-            // back to opening the app quickly (no long empty-screen wait). Once Yandex plays, the
-            // retry-bind in start() picks the session up on the next visit.
+            // back to opening the app quickly (no long empty-screen wait). Once a session appears,
+            // rebind() nudges it to actually play.
             var tries = 0
-            while (controller == null && tries < 3) { delay(500); rebind(); tries++ }
+            while (controller == null && tries < 3) { delay(500); rebind(); refresh(); tries++ }
             if (controller == null) {
                 AppLog.w("MUSIC", "cold-start: no session after PLAY — opening app")
                 fallbackLaunch(targetPackage)
@@ -74,29 +72,41 @@ class MusicViewModel(
     }
 
     private fun rebind() {
-        callback?.let { rawController?.unregisterCallback(it) }
         val rc = repo.activeController(targetPackage)
-        AppLog.d("MUSIC", "rebind: ${if (rc != null) "session found" else "no target session"} — ${repo.dumpSessions()}")
-        rawController = rc
-        controller = rc?.let { MusicController(it) }
-        if (rc != null) {
-            val cb = object : MediaController.Callback() {
-                override fun onMetadataChanged(m: android.media.MediaMetadata?) = refresh()
-                override fun onPlaybackStateChanged(s: android.media.session.PlaybackState?) = refresh()
-                override fun onSessionDestroyed() = rebind()
+        // getActiveSessions() returns a fresh MediaController each call, so compare by session token
+        // (not object identity) to re-wire the callback only when the session actually changes.
+        if (rc?.sessionToken != rawController?.sessionToken) {
+            callback?.let { cb -> runCatching { rawController?.unregisterCallback(cb) } }
+            rawController = rc
+            controller = rc?.let { MusicController(it) }
+            AppLog.d("MUSIC", "rebind: ${if (rc != null) "session" else "none"} — ${repo.dumpSessions()}")
+            if (rc != null) {
+                val cb = object : MediaController.Callback() {
+                    override fun onMetadataChanged(m: android.media.MediaMetadata?) = refresh()
+                    override fun onPlaybackStateChanged(s: android.media.session.PlaybackState?) = refresh()
+                    override fun onSessionDestroyed() { rawController = null; controller = null; refresh() }
+                }
+                callback = cb
+                rc.registerCallback(cb)
             }
-            callback = cb
-            rc.registerCallback(cb)
         }
-        refresh()
+        // Cold-start: we opened Yandex; if its session is idle, tell it to actually play (once).
+        val ctl = controller
+        if (coldStartPending && ctl != null) {
+            if (ctl.isPlaying()) coldStartPending = false
+            else { runCatching { ctl.play() }; AppLog.d("MUSIC", "cold-start: nudge play()") }
+        }
     }
 
     private fun refresh() {
         try {
             val np = controller?.nowPlaying(SystemClock.elapsedRealtime())
+            // An open-but-idle session (STATE_NONE + blank title) must NOT render as an empty "Playing"
+            // screen — that is the grey void. Only treat it as playback with a real track / while playing.
+            val real = np != null && (np.title.isNotBlank() || np.isPlaying)
             val next = MusicUiState.selectState(
                 hasPermission = NotificationAccess.isGranted(context),
-                nowPlaying = np,
+                nowPlaying = if (real) np else null,
             )
             // Log only on state-class transitions (not every 1s tick) to avoid per-tick spam.
             val prev = _state.value
