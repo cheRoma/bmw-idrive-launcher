@@ -304,7 +304,10 @@ class HomeActivity : ComponentActivity() {
                                 }
                             },
                             onColdStartPlay = {
-                                launcher.launch("ru.yandex.music")
+                                // Start Yandex in the background (media-button) so our now-playing
+                                // fills in without the full Yandex UI popping up; fall back to
+                                // opening the app only if no session appears.
+                                musicVm.startBackgroundPlay(lifecycleScope) { launcher.launch(it) }
                             },
                             onBack = { nav.popBackStack() },
                         )

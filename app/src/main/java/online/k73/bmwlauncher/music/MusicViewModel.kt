@@ -34,8 +34,33 @@ class MusicViewModel(
         if (tickJob?.isActive == true) return // already running — don't stack tick loops
         sessionsListener = repo.observeSessions { rebind() }
         rebind()
+        // The notification listener can connect a beat after this screen opens; if Yandex's
+        // session already existed by then, the "sessions changed" callback never fires — so poll
+        // a few times to pick it up instead of sitting on an empty screen.
+        scope.launch {
+            var tries = 0
+            while (controller == null && tries < 8) { delay(500); rebind(); tries++ }
+        }
         tickJob = scope.launch {
             while (true) { refresh(); delay(1000) }
+        }
+    }
+
+    /**
+     * Cold-start: nothing bound yet. Wake Yandex in the BACKGROUND via a media-button PLAY (no
+     * full-app UI), then poll for its session. Only if that fails after a few seconds do we fall
+     * back to opening the app.
+     */
+    fun startBackgroundPlay(scope: CoroutineScope, fallbackLaunch: (String) -> Unit) {
+        AppLog.d("MUSIC", "cold-start: background PLAY -> $targetPackage")
+        repo.sendPlay(targetPackage)
+        scope.launch {
+            var tries = 0
+            while (controller == null && tries < 8) { delay(500); rebind(); tries++ }
+            if (controller == null) {
+                AppLog.w("MUSIC", "cold-start: no session after PLAY — opening app")
+                fallbackLaunch(targetPackage)
+            }
         }
     }
 
@@ -48,7 +73,7 @@ class MusicViewModel(
     private fun rebind() {
         callback?.let { rawController?.unregisterCallback(it) }
         val rc = repo.activeController(targetPackage)
-        AppLog.d("MUSIC", if (rc != null) "rebind: session found" else "rebind: no session")
+        AppLog.d("MUSIC", "rebind: ${if (rc != null) "session found" else "no target session"} — ${repo.dumpSessions()}")
         rawController = rc
         controller = rc?.let { MusicController(it) }
         if (rc != null) {
@@ -86,8 +111,9 @@ class MusicViewModel(
     fun next() = controller?.next()
     fun prev() = controller?.prev()
     fun seekTo(ms: Long) = controller?.seekTo(ms)
-    fun like() { val n = (state.value as? MusicUiState.Playing)?.nowPlaying?.likeActionName; if (n != null) controller?.sendLike(n) }
-
-    /** Cold-start: nothing playing → launch Yandex Music so a session appears. */
-    fun startPlaybackColdStart(launch: (String) -> Unit) = launch(targetPackage)
+    fun like() {
+        val n = (state.value as? MusicUiState.Playing)?.nowPlaying?.likeActionName
+        AppLog.d("MUSIC", "like tapped -> action=${n ?: "none"}")
+        if (n != null) controller?.sendLike(n)
+    }
 }
