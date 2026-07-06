@@ -119,6 +119,12 @@ class HomeActivity : ComponentActivity() {
         // launcher back. NO_ANIMATION + this short settle shrinks the Yandex flash to a flicker
         // (a launched activity can't be fully hidden without root). Raise if Yandex needs longer.
         const val MUSIC_SETTLE_MS = 1200L
+
+        // After foregrounding Yandex we poll for real playback (nudging PLAY) before pulling our
+        // launcher back, so we never return before «Моя волна» starts. Bounded by MAX so a stuck
+        // Yandex can't hang us on its own screen forever.
+        const val MUSIC_POLL_MS = 400L
+        const val MUSIC_FOREGROUND_MAX_MS = 5000L
     }
 
     /**
@@ -130,8 +136,21 @@ class HomeActivity : ComponentActivity() {
         val intent = launcher.launchIntentFor(pkg)?.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION) ?: return
         startActivity(intent)
         lifecycleScope.launch {
+            // Let Yandex reach the foreground, then wait until «Моя волна» actually starts (nudging
+            // PLAY each poll), and only THEN pull our launcher back. Returning too early yanks Yandex
+            // to the background before it begins → nothing plays (the old MUSIC_SETTLE-only bug).
             kotlinx.coroutines.delay(MUSIC_SETTLE_MS)
-            runCatching { musicRepo.sendPlay(pkg) }
+            var waited = 0L
+            while (waited < MUSIC_FOREGROUND_MAX_MS) {
+                runCatching { musicRepo.sendPlay(pkg) }
+                val playing = runCatching {
+                    musicRepo.activeController(pkg)?.playbackState?.state ==
+                        android.media.session.PlaybackState.STATE_PLAYING
+                }.getOrDefault(false)
+                if (playing) break
+                kotlinx.coroutines.delay(MUSIC_POLL_MS)
+                waited += MUSIC_POLL_MS
+            }
             runCatching {
                 startActivity(
                     Intent(this@HomeActivity, HomeActivity::class.java)
@@ -307,32 +326,35 @@ class HomeActivity : ComponentActivity() {
                     }
                     composable("music") {
                         val musicState by musicVm.state.collectAsState()
+                        val coldStart by musicVm.coldStart.collectAsState()
                         DisposableEffect(Unit) {
-                            musicVm.start(lifecycleScope)
+                            musicVm.start(lifecycleScope) { launchYandexAndReturn(it) }
                             onDispose { musicVm.stop() }
                         }
                         MusicScreen(
                             state = musicState,
+                            coldStart = coldStart,
                             albumArt = musicVm.albumArt()?.asImageBitmap(),
                             onPlayPause = { musicVm.playPause() },
                             onNext = { musicVm.next() },
                             onPrev = { musicVm.prev() },
                             onSeek = { musicVm.seekTo(it) },
                             onLike = { musicVm.like() },
-                            onPlaylists = {
-                                // Phase 3 will try MediaBrowser; for now open Yandex Music (also the
-                                // "grant permission" tap target when access is missing).
+                            onSource = {
+                                // Tapping the source badge (v4) opens Yandex Music; also the
+                                // "grant permission" tap target when notification access is missing.
                                 if (!NotificationAccess.isGranted(applicationContext)) {
                                     startActivity(NotificationAccess.settingsIntent())
                                 } else {
                                     launcher.launch("ru.yandex.music")
                                 }
                             },
+                            onShuffle = { musicVm.toggleShuffle() },
                             onColdStartPlay = {
-                                // Start Yandex in the background (media-button) so our now-playing
-                                // fills in without the full Yandex UI popping up; fall back to
-                                // opening the app only if no session appears.
-                                musicVm.startBackgroundPlay(lifecycleScope) { launchYandexAndReturn(it) }
+                                // Explicit "Включить музыку": open Yandex foreground so «Моя волна»
+                                // auto-plays (the only reliable way from a fully-killed app), then
+                                // our now-playing fills in and we return to it.
+                                musicVm.launchForeground(lifecycleScope)
                             },
                             onBack = { nav.popBackStack() },
                         )

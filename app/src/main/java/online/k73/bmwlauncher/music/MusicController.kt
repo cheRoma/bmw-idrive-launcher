@@ -46,6 +46,15 @@ class MusicController(private val controller: MediaController) {
 
     fun play() = controller.transportControls.play()
 
+    /** The framework MediaController has no shuffle API; Yandex exposes it (if at all) as a custom
+     *  action. Send the first custom action whose name matches [match]; returns false if none. */
+    fun trySendCustomAction(match: String): Boolean {
+        val name = controller.playbackState?.customActions?.map { it.action }
+            ?.firstOrNull { it.contains(match, true) } ?: return false
+        controller.transportControls.sendCustomAction(name, null)
+        return true
+    }
+
     fun playPause() {
         val playing = controller.playbackState?.state == PlaybackState.STATE_PLAYING
         if (playing) controller.transportControls.pause() else controller.transportControls.play()
