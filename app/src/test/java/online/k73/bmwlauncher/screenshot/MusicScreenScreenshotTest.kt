@@ -24,14 +24,14 @@ class MusicScreenScreenshotTest {
     @Test fun music_playing() {
         paparazzi.snapshot {
             BmwLauncherTheme(isNight = true) {
-                MusicScreen(MusicUiState.Playing(np), null, {}, {}, {}, {}, {}, {}, {}, {})
+                MusicScreen(MusicUiState.Playing(np), null, {}, {}, {}, {}, {}, {}, {}, {}, {})
             }
         }
     }
     @Test fun music_no_playback() {
         paparazzi.snapshot {
             BmwLauncherTheme(isNight = true) {
-                MusicScreen(MusicUiState.NoPlayback, null, {}, {}, {}, {}, {}, {}, {}, {})
+                MusicScreen(MusicUiState.NoPlayback, null, {}, {}, {}, {}, {}, {}, {}, {}, {})
             }
         }
     }
