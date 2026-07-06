@@ -55,8 +55,11 @@ class MusicViewModel(
         AppLog.d("MUSIC", "cold-start: background PLAY -> $targetPackage")
         repo.sendPlay(targetPackage)
         scope.launch {
+            // Give the media-button a short chance; if Yandex isn't running it won't wake, so fall
+            // back to opening the app quickly (no long empty-screen wait). Once Yandex plays, the
+            // retry-bind in start() picks the session up on the next visit.
             var tries = 0
-            while (controller == null && tries < 8) { delay(500); rebind(); tries++ }
+            while (controller == null && tries < 3) { delay(500); rebind(); tries++ }
             if (controller == null) {
                 AppLog.w("MUSIC", "cold-start: no session after PLAY — opening app")
                 fallbackLaunch(targetPackage)
