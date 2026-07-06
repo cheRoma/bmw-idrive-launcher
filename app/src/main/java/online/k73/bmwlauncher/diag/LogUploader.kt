@@ -83,7 +83,11 @@ object LogUploader {
     /** Dump our own process's logcat. Best-effort; returns "" on any failure. */
     private fun captureLogcat(): String {
         return try {
-            val proc = Runtime.getRuntime().exec(arrayOf("logcat", "-d", "-v", "time"))
+            // redirectErrorStream drains stderr into stdout — reading a single stream to EOF
+            // then can't deadlock on an unread stderr pipe. `logcat -d` dumps and exits.
+            val proc = ProcessBuilder("logcat", "-d", "-v", "time")
+                .redirectErrorStream(true)
+                .start()
             val lines = proc.inputStream.bufferedReader().useLines { seq ->
                 // Keep the tail: bounded deque of the last MAX_LOGCAT_LINES lines.
                 val deque = ArrayDeque<String>(MAX_LOGCAT_LINES)
@@ -93,7 +97,9 @@ object LogUploader {
                 }
                 deque.toList()
             }
-            runCatching { proc.destroy() }
+            runCatching {
+                if (!proc.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) proc.destroyForcibly()
+            }
             var text = lines.joinToString("\n")
             if (text.length > MAX_LOGCAT_BYTES) {
                 text = text.substring(text.length - MAX_LOGCAT_BYTES)
