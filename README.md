@@ -1,5 +1,7 @@
 # BMW iDrive Launcher
 
+**English** · [Русский](README.ru.md)
+
 **A custom Android home-screen launcher that turns a cheap aftermarket head unit into a premium, BMW-iDrive-style car interface.**
 
 Built for a **2005 BMW X5 (E53)** running an **XTRONS** Android head unit, this launcher replaces the sluggish factory desktop with a fast, touch-first UI inspired by modern **iDrive**: a 3D tile carousel, an instrument-amber accent on near-black graphite, a now-playing screen wired to **Yandex Music**, guaranteed autostart of the **i-Bus** trip-computer app, in-app OTA updates, and one-tap reboot — all in **Kotlin + Jetpack Compose**, screenshot-tested, no root required.
