@@ -1,6 +1,7 @@
 package online.k73.bmwlauncher
 
 import android.app.Application
+import android.os.Build
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -17,6 +18,9 @@ class MainApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Robolectric runs this Application in unit tests; its slow env trips the ANR watchdog and
+        // would spam the real upload endpoint. Skip the live diagnostics there.
+        if ("robolectric".equals(Build.FINGERPRINT, ignoreCase = true)) return
         runCatching {
             AppLog.d("App", "launch v${BuildConfig.VERSION_NAME}")
             CrashHandler.install(this)

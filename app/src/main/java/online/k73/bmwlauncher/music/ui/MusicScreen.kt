@@ -1,6 +1,13 @@
 package online.k73.bmwlauncher.music.ui
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -125,9 +132,29 @@ private fun PlayingBody(
 ) {
     val c = LocalLauncherColors.current
     Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-        // ── Left: album art, sized to fit the body height (no fixed width → never overflows) ──
+        // ── Left: album art with a gentle "alive" motion while playing ──
         Column(horizontalAlignment = Alignment.Start, verticalArrangement = Arrangement.Center) {
-            Envelope(art, Modifier.fillMaxHeight(0.80f).aspectRatio(1f))
+            val infinite = rememberInfiniteTransition(label = "art")
+            val zoom by infinite.animateFloat(
+                initialValue = 1f, targetValue = 1.06f,
+                animationSpec = infiniteRepeatable(tween(9000, easing = LinearEasing), RepeatMode.Reverse),
+                label = "kenburns",
+            )
+            val glow by infinite.animateFloat(
+                initialValue = 0.05f, targetValue = 0.16f,
+                animationSpec = infiniteRepeatable(tween(3600, easing = LinearEasing), RepeatMode.Reverse),
+                label = "glow",
+            )
+            Box(contentAlignment = Alignment.Center) {
+                if (np.isPlaying) {
+                    // breathing amber halo behind the cover
+                    Box(
+                        Modifier.fillMaxHeight(0.80f).aspectRatio(1f).scale(1.16f).clip(RoundedCornerShape(28.dp))
+                            .background(Brush.radialGradient(listOf(c.accent.copy(alpha = glow), Color.Transparent))),
+                    )
+                }
+                Envelope(art, Modifier.fillMaxHeight(0.80f).aspectRatio(1f), zoom = if (np.isPlaying) zoom else 1f)
+            }
             Spacer(Modifier.height(14.dp))
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp)) {
                 Box(Modifier.size(7.dp).clip(CircleShape).background(c.accent))
@@ -156,11 +183,12 @@ private fun PlayingBody(
 
 // ── Album art card ───────────────────────────────────────────────────────────
 @Composable
-private fun Envelope(art: ImageBitmap?, modifier: Modifier = Modifier) {
+private fun Envelope(art: ImageBitmap?, modifier: Modifier = Modifier, zoom: Float = 1f) {
     val c = LocalLauncherColors.current
     Box(modifier.clip(RoundedCornerShape(5.dp)).background(c.tile)) {
         if (art != null) {
-            Image(art, "Обложка альбома", Modifier.fillMaxSize())
+            // slow Ken-Burns zoom on the cover; the card clip keeps it in bounds
+            Image(art, "Обложка альбома", Modifier.fillMaxSize().graphicsLayer { scaleX = zoom; scaleY = zoom })
         } else {
             // Striped placeholder (45° stripes) + caption.
             val stripe = c.surfaceHi
@@ -311,7 +339,9 @@ private fun PillRow(np: NowPlaying, onLike: () -> Unit, onPlaylists: () -> Unit)
                         color = if (liked) c.accent.copy(alpha = 0.5f) else c.hairline,
                         shape = RoundedCornerShape(999.dp),
                     )
-                    .clickable(interactionSource = interaction, indication = null) { liked = !liked; onLike() }
+                    // One-way "add to Мне нравится": one tap likes; we DON'T toggle off on a second
+                    // tap, because Yandex's actionLike may un-like and it never reports the real state.
+                    .clickable(interactionSource = interaction, indication = null) { if (!liked) { liked = true; onLike() } }
                     .padding(horizontal = 18.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
