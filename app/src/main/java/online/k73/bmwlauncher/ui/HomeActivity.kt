@@ -25,6 +25,9 @@ import kotlinx.coroutines.launch
 import online.k73.bmwlauncher.autostart.AutostartController
 import online.k73.bmwlauncher.data.LauncherSettings
 import online.k73.bmwlauncher.data.SettingsStore
+import online.k73.bmwlauncher.diag.AppLog
+import online.k73.bmwlauncher.diag.LogSendState
+import online.k73.bmwlauncher.diag.LogUploader
 import online.k73.bmwlauncher.launch.AppLauncher
 import online.k73.bmwlauncher.launch.InstalledApps
 import online.k73.bmwlauncher.system.RootShell
@@ -70,6 +73,7 @@ class HomeActivity : ComponentActivity() {
         )
     }
     private val updateState = androidx.compose.runtime.mutableStateOf<UpdateUiState>(UpdateUiState.Idle)
+    private val logState = androidx.compose.runtime.mutableStateOf(LogSendState.Idle)
 
     private val musicRepo by lazy { MediaSessionRepository(applicationContext) }
     private val musicVm by lazy { MusicViewModel(applicationContext, musicRepo, "ru.yandex.music") }
@@ -155,8 +159,10 @@ class HomeActivity : ComponentActivity() {
 
     private fun onCheckUpdate() {
         updateState.value = UpdateUiState.Checking
+        AppLog.d("UPDATE", "check start")
         lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val status = updateChecker.fetch(BuildConfig.VERSION_CODE)
+            AppLog.d("UPDATE", "check result: ${status::class.simpleName}")
             updateState.value = when (status) {
                 is UpdateStatus.UpToDate -> UpdateUiState.UpToDate
                 is UpdateStatus.Available -> UpdateUiState.Available(status.versionName, status.apkUrl, status.notes)
@@ -165,17 +171,30 @@ class HomeActivity : ComponentActivity() {
         }
     }
 
+    private fun onSendLogs() {
+        if (logState.value == LogSendState.Sending) return
+        logState.value = LogSendState.Sending
+        AppLog.d("DIAG", "manual log upload requested")
+        lifecycleScope.launch {
+            val r = LogUploader.upload(applicationContext, "manual")
+            AppLog.d("DIAG", "manual log upload result: ${if (r.isSuccess) "ok" else "fail"}")
+            logState.value = if (r.isSuccess) LogSendState.Sent else LogSendState.Failed
+        }
+    }
+
     private fun onInstallUpdate() {
         val avail = updateState.value as? UpdateUiState.Available ?: return
+        AppLog.d("UPDATE", "install start: ${avail.versionName}")
         lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val file = downloader.download(avail.apkUrl) { p -> updateState.value = UpdateUiState.Downloading(p) }
                 updateState.value = UpdateUiState.Installing
                 when (val r = apkInstaller.install(file)) {
-                    is InstallResult.Failed -> updateState.value = UpdateUiState.Failed(r.message)
+                    is InstallResult.Failed -> { AppLog.w("UPDATE", "install failed: ${r.message}"); updateState.value = UpdateUiState.Failed(r.message) }
                     else -> { /* silent: process restarts; intent: system UI takes over */ }
                 }
             } catch (t: Throwable) {
+                AppLog.e("UPDATE", "install error", t)
                 updateState.value = UpdateUiState.Failed(t.message ?: "download failed")
             }
         }
@@ -187,6 +206,7 @@ class HomeActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppLog.d("HOME", "onCreate")
         enableImmersiveMode()
         // Resolve default-launcher status once up front so the first Settings visit is correct.
         isDefaultLauncherState.value = computeIsDefaultLauncher()
@@ -218,6 +238,7 @@ class HomeActivity : ComponentActivity() {
                             now = nowDateTime,
                             temp = null, // wired to the Microntek outside-temp broadcast later
                             onTile = { id ->
+                                AppLog.d("NAV", "tile tapped: $id")
                                 when (id) {
                                     TileId.MUSIC -> nav.navigate("music")
                                     TileId.APPS -> nav.navigate("apps")
@@ -241,6 +262,7 @@ class HomeActivity : ComponentActivity() {
                         val update by updateState
                         val hasRoot by hasRootState
                         val isDefault by isDefaultLauncherState
+                        val logSend by logState
                         SettingsScreen(
                             settings = settings,
                             onAutostart = { lifecycleScope.launch { store.setAutostartIBus(it) } },
@@ -253,6 +275,8 @@ class HomeActivity : ComponentActivity() {
                             onInstallUpdate = { onInstallUpdate() },
                             isDefaultLauncher = isDefault,
                             onSetDefault = { requestDefaultLauncher() },
+                            logState = logSend,
+                            onSendLogs = { onSendLogs() },
                             onBack = { nav.popBackStack() },
                         )
                     }
@@ -306,9 +330,11 @@ class HomeActivity : ComponentActivity() {
             if (s.autostartIBus && s.iBusPackage.isNotBlank()) {
                 val ibusIntent = launcher.launchIntentFor(s.iBusPackage)?.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
                 if (ibusIntent != null) {
+                    AppLog.d("AUTOSTART", "autostart iBus: ${s.iBusPackage}")
                     startActivity(ibusIntent)
                     if (s.bringLauncherToFront) {
                         kotlinx.coroutines.delay(IBUS_SETTLE_MS)
+                        AppLog.d("AUTOSTART", "bring launcher to front")
                         startActivity(
                             Intent(this@HomeActivity, HomeActivity::class.java)
                                 .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_NO_ANIMATION)

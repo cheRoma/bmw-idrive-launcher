@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import online.k73.bmwlauncher.data.LauncherSettings
 import online.k73.bmwlauncher.data.ThemeMode
+import online.k73.bmwlauncher.diag.LogSendState
 import online.k73.bmwlauncher.ui.theme.Inter
 import online.k73.bmwlauncher.ui.theme.LocalLauncherColors
 import online.k73.bmwlauncher.ui.theme.ScreenHeader
@@ -53,6 +54,8 @@ fun SettingsScreen(
     onInstallUpdate: () -> Unit,
     isDefaultLauncher: Boolean,
     onSetDefault: () -> Unit,
+    logState: LogSendState,
+    onSendLogs: () -> Unit,
     onBack: () -> Unit,
 ) {
     val c = LocalLauncherColors.current
@@ -97,6 +100,8 @@ fun SettingsScreen(
         }
         RowDivider()
         UpdateRow(currentVersion, hasRoot, updateState, onCheckUpdate, onInstallUpdate)
+        RowDivider()
+        DiagnosticsRow(logState, onSendLogs)
         RowDivider()
 
         Spacer(Modifier.height(12.dp))
@@ -198,6 +203,20 @@ private fun AmberPill(label: String, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Text(label, color = c.background, fontSize = TypeTokens.label, fontWeight = FontWeight.SemiBold, fontFamily = Inter)
+    }
+}
+
+@Composable
+private fun DiagnosticsRow(logState: LogSendState, onSendLogs: () -> Unit) {
+    val label = when (logState) {
+        LogSendState.Idle -> "Отправить"
+        LogSendState.Sending -> "Отправка…"
+        LogSendState.Sent -> "Отправлено ✓"
+        LogSendState.Failed -> "Ошибка · ещё раз"
+    }
+    SettingRow(title = "Диагностика", subtitle = "Отправить логи разработчику") {
+        // Ignore taps while a send is in flight.
+        AmberPill(label) { if (logState != LogSendState.Sending) onSendLogs() }
     }
 }
 

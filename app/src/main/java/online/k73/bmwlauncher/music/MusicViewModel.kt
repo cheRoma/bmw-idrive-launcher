@@ -9,6 +9,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import online.k73.bmwlauncher.diag.AppLog
 
 /**
  * Owns the MusicUiState. Binds to Yandex Music's active session, re-reads on callbacks,
@@ -47,6 +48,7 @@ class MusicViewModel(
     private fun rebind() {
         callback?.let { rawController?.unregisterCallback(it) }
         val rc = repo.activeController(targetPackage)
+        AppLog.d("MUSIC", if (rc != null) "rebind: session found" else "rebind: no session")
         rawController = rc
         controller = rc?.let { MusicController(it) }
         if (rc != null) {
@@ -62,11 +64,21 @@ class MusicViewModel(
     }
 
     private fun refresh() {
-        val np = controller?.nowPlaying(SystemClock.elapsedRealtime())
-        _state.value = MusicUiState.selectState(
-            hasPermission = NotificationAccess.isGranted(context),
-            nowPlaying = np,
-        )
+        try {
+            val np = controller?.nowPlaying(SystemClock.elapsedRealtime())
+            val next = MusicUiState.selectState(
+                hasPermission = NotificationAccess.isGranted(context),
+                nowPlaying = np,
+            )
+            // Log only on state-class transitions (not every 1s tick) to avoid per-tick spam.
+            val prev = _state.value
+            if (prev::class != next::class) {
+                AppLog.d("MUSIC", "state: ${prev::class.simpleName} -> ${next::class.simpleName}")
+            }
+            _state.value = next
+        } catch (t: Throwable) {
+            AppLog.e("MUSIC", "refresh failed", t)
+        }
     }
 
     fun albumArt() = controller?.albumArt()

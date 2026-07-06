@@ -21,6 +21,10 @@ android {
         targetSdk = 33
         versionCode = 17
         versionName = "1.4.1"
+
+        // Diagnostic log upload endpoint (token kept out of VCS via keystore.properties).
+        buildConfigField("String", "LOG_UPLOAD_URL", "\"https://k73.online/newBMW/logs/upload\"")
+        buildConfigField("String", "LOG_UPLOAD_TOKEN", "\"${keystoreProps.getProperty("logUploadToken") ?: ""}\"")
     }
     signingConfigs {
         create("release") {
