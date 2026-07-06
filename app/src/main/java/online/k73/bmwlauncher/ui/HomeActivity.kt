@@ -290,6 +290,7 @@ class HomeActivity : ComponentActivity() {
                                     TileId.NAV -> launcher.launch(settings.navPackage)
                                     TileId.IBUS -> launcher.launch(settings.iBusPackage)
                                     TileId.CARPLAY -> launcher.launch(settings.carplayPackage)
+                                    TileId.YOUTUBE -> launcher.launch("com.google.android.youtube")
                                 }
                             },
                         )
