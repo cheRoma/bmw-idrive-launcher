@@ -114,6 +114,31 @@ class HomeActivity : ComponentActivity() {
         // front. On non-root stock Android an activity launch is necessarily briefly visible; NO_ANIMATION
         // + a short settle shrinks the i-Bus flash to a flicker. Raise if i-Bus needs longer to connect.
         const val IBUS_SETTLE_MS = 300L
+
+        // Cold-start Music: Yandex must be foregrounded briefly to start playing, then we pull our
+        // launcher back. NO_ANIMATION + this short settle shrinks the Yandex flash to a flicker
+        // (a launched activity can't be fully hidden without root). Raise if Yandex needs longer.
+        const val MUSIC_SETTLE_MS = 1200L
+    }
+
+    /**
+     * Cold-start Music without leaving the user staring at the full Yandex app: launch Yandex
+     * (no animation) so a session can appear, then after a short settle send a media-button PLAY
+     * and reorder our launcher back to the front. Yandex only flickers; our now-playing then binds.
+     */
+    private fun launchYandexAndReturn(pkg: String) {
+        val intent = launcher.launchIntentFor(pkg)?.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION) ?: return
+        startActivity(intent)
+        lifecycleScope.launch {
+            kotlinx.coroutines.delay(MUSIC_SETTLE_MS)
+            runCatching { musicRepo.sendPlay(pkg) }
+            runCatching {
+                startActivity(
+                    Intent(this@HomeActivity, HomeActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_NO_ANIMATION)
+                )
+            }
+        }
     }
 
     /**
@@ -307,7 +332,7 @@ class HomeActivity : ComponentActivity() {
                                 // Start Yandex in the background (media-button) so our now-playing
                                 // fills in without the full Yandex UI popping up; fall back to
                                 // opening the app only if no session appears.
-                                musicVm.startBackgroundPlay(lifecycleScope) { launcher.launch(it) }
+                                musicVm.startBackgroundPlay(lifecycleScope) { launchYandexAndReturn(it) }
                             },
                             onBack = { nav.popBackStack() },
                         )
