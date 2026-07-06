@@ -36,6 +36,16 @@ class MusicController(private val controller: MediaController) {
         )
     }
 
+    fun isPlaying(): Boolean = controller.playbackState?.state == PlaybackState.STATE_PLAYING
+
+    /** True when the session exists but has nothing loaded (Yandex just opened, not playing yet). */
+    fun isIdle(): Boolean {
+        val st = controller.playbackState?.state ?: PlaybackState.STATE_NONE
+        return st == PlaybackState.STATE_NONE || st == PlaybackState.STATE_STOPPED
+    }
+
+    fun play() = controller.transportControls.play()
+
     fun playPause() {
         val playing = controller.playbackState?.state == PlaybackState.STATE_PLAYING
         if (playing) controller.transportControls.pause() else controller.transportControls.play()
