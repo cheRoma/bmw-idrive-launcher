@@ -36,6 +36,8 @@ class SettingsScreenScreenshotTest {
                     onInstallUpdate = {},
                     isDefaultLauncher = false,
                     onSetDefault = {},
+                    logState = online.k73.bmwlauncher.diag.LogSendState.Idle,
+                    onSendLogs = {},
                     onBack = {},
                 )
             }
