@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.Cast
 import androidx.compose.material.icons.outlined.Navigation
+import androidx.compose.material.icons.outlined.SmartDisplay
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.runtime.Composable
@@ -26,6 +27,7 @@ val defaultTiles = listOf(
     Tile(TileId.IBUS, "Борткомпьютер", Icons.Outlined.Speed),
     Tile(TileId.SETTINGS, "Настройки", Icons.Outlined.Tune),
     Tile(TileId.CARPLAY, "CarPlay", Icons.Outlined.Cast),
+    Tile(TileId.YOUTUBE, "YouTube", Icons.Outlined.SmartDisplay),
 )
 
 @Composable
