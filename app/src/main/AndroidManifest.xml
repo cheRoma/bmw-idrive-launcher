@@ -7,6 +7,12 @@
         tools:ignore="QueryAllPackagesPermission" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Audio-reactive equalizer: Visualizer on the global output mix (session 0).
+         RECORD_AUDIO is the runtime perm; some ROMs also gate session-0 capture behind
+         signature-level CAPTURE_AUDIO_OUTPUT (granted via root on the head unit). If the
+         Visualizer can't be created, the equalizer falls back to the synthetic animation. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <application
         android:name=".MainApplication"
