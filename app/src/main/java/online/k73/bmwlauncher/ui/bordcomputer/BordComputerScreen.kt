@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -26,7 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import online.k73.bmwlauncher.car.BordData
-import online.k73.bmwlauncher.car.IBusReader
+import online.k73.bmwlauncher.car.IBusService
 import online.k73.bmwlauncher.ui.theme.Inter
 import online.k73.bmwlauncher.ui.theme.LocalLauncherColors
 
@@ -34,11 +33,8 @@ import online.k73.bmwlauncher.ui.theme.LocalLauncherColors
 fun BordComputerScreen(onBack: () -> Unit = {}) {
     val c = LocalLauncherColors.current
     val appCtx = LocalContext.current.applicationContext
-    val reader = remember { IBusReader(appCtx) }
-    DisposableEffect(Unit) {
-        reader.start()
-        onDispose { reader.stop() }
-    }
+    // Shared process-wide reader (also feeds the home status bar) — already connected, no start/stop here.
+    val reader = remember { IBusService.get(appCtx) }
     val data by reader.data.collectAsState()
 
     Column(Modifier.fillMaxSize().background(c.background).padding(horizontal = 40.dp, vertical = 24.dp)) {
