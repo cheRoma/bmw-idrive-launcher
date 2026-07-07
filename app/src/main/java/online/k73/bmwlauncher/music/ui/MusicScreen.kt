@@ -69,6 +69,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.material.icons.filled.Shuffle
@@ -320,7 +324,7 @@ private fun CircleControl(
     ) { content() }
 }
 
-// ── Progress: passed portion is a live amber equalizer; remainder is a thin line ──
+// ── Progress: a single flowing amber wave line; played = amber+glow, ahead = dim grey ──
 @Composable
 private fun EqualizerProgress(np: NowPlaying, onSeek: (Long) -> Unit) {
     val amber = LocalLauncherColors.current.accent
@@ -355,53 +359,53 @@ private fun EqualizerProgress(np: NowPlaying, onSeek: (Long) -> Unit) {
             Canvas(Modifier.fillMaxSize()) {
                 val w = size.width
                 val cy = size.height / 2f
-                // Full-width spectrum analyzer: bars span the WHOLE width and dance to the music.
-                // Progress is shown by colour — played = amber, ahead = dim grey — with the knob
-                // riding the boundary. Discrete, well-spaced bars with deep valleys (gamma) so it
-                // reads as bouncing bars, never a solid "growing bar".
-                val stepPx = 7.dp.toPx()
-                val barW = 2.dp.toPx()   // thinner, more elegant
-                val r = 1.dp.toPx()
-                val floorH = 2.5.dp.toPx()
-                val maxH = 24.dp.toPx()   // low amplitude — ambient ripple, not a jumping EQ
-                val fadeW = w * 0.12f     // opacity taper at both ends
                 val boundary = w * shown
-                val count = (w / stepPx).toInt().coerceAtLeast(1)
                 val spec = spectrum
-                val greyHi = Color(0xFF9AA0A6)
-                val greyLo = Color(0xFF5A5F65)
-                for (i in 0 until count) {
-                    val x = i * stepPx + stepPx / 2f
+                // ONE flowing wave line instead of bars: a travelling sine whose local
+                // amplitude is the live audio envelope (bass→treble mapped left→right).
+                // The phase advances with tMs, so the wave drifts while playing and freezes
+                // on pause. Progress is shown by colour — played = amber (with a soft glow),
+                // ahead = dim grey — and the seek knob rides the boundary.
+                val stepPx = 3.dp.toPx()
+                val count = (w / stepPx).toInt().coerceAtLeast(2)
+                val floorAmp = 4.dp.toPx()      // constant undulation — the line always "flows"
+                val maxAmp = 22.dp.toPx()       // audio adds height on top; calm, not a jumping EQ
+                val waveK = 0.055f              // spatial frequency of the carrier
+                val phase = tMs * 0.004f        // drift speed; frozen when paused
+                val path = Path()
+                for (i in 0..count) {
+                    val x = i * stepPx
                     val level = if (spec != null && spec.isNotEmpty()) {
-                        // Live audio: interpolate the spectrum envelope across bars (bass→treble).
+                        // Live audio: interpolate the spectrum envelope across the width.
                         val f = i.toFloat() / count * spec.size
                         val b0 = f.toInt().coerceIn(0, spec.size - 1)
                         val b1 = (b0 + 1).coerceIn(0, spec.size - 1)
                         (spec[b0] + (spec[b1] - spec[b0]) * (f - b0)).coerceIn(0f, 1f)
                     } else {
-                        // Fallback: synthetic per-bar shape + time pulse (freezes when paused).
-                        val phase = (tMs - (i * 53) % 400).toFloat() / (420 + (i * 37) % 240).toFloat()
+                        // Fallback: synthetic per-x shape + time pulse (freezes when paused).
+                        val ph = (tMs - (i * 53) % 400).toFloat() / (420 + (i * 37) % 240).toFloat()
                         val base = 0.30f + 0.30f * abs(sin(i * 0.7f))
-                        (base * (0.55f + 0.45f * sin(phase * 2f * PI.toFloat() + i))).coerceIn(0f, 1f)
+                        (base * (0.55f + 0.45f * sin(ph * 2f * PI.toFloat() + i))).coerceIn(0f, 1f)
                     }
-                    val lv = level * level                       // gamma → deep valleys, lively peaks
-                    val bh = floorH + lv * (maxH - floorH)
-                    val played = x <= boundary
-                    val edge = (minOf(x, w - x) / fadeW).coerceIn(0f, 1f)   // fade at the ends
-                    val brush = if (played)
-                        Brush.verticalGradient(listOf(amberLite, amber), startY = cy - bh / 2, endY = cy + bh / 2)
-                    else
-                        Brush.verticalGradient(listOf(greyHi, greyLo), startY = cy - bh / 2, endY = cy + bh / 2)
-                    drawRoundRect(
-                        brush = brush,
-                        topLeft = Offset(x - barW / 2, cy - bh / 2),
-                        size = Size(barW, bh),
-                        cornerRadius = CornerRadius(r, r),
-                        alpha = (if (played) 0.82f else 0.30f) * edge,   // muted amber + edge fade
-                    )
+                    val edge = (minOf(x, w - x) / (w * 0.10f)).coerceIn(0f, 1f)   // taper at the ends
+                    val amp = (floorAmp + level * (maxAmp - floorAmp)) * edge
+                    val y = cy + sin(x * waveK - phase) * amp
+                    if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
                 }
-                drawCircle(amber.copy(alpha = 0.22f), radius = 13.dp.toPx(), center = Offset(boundary, cy))
-                drawCircle(amber, radius = 9.5.dp.toPx(), center = Offset(boundary, cy))
+                // Ahead: dim grey line for the not-yet-played part.
+                clipRect(left = boundary, top = 0f, right = w, bottom = size.height) {
+                    drawPath(path, color = Color(0xFF7A8087), alpha = 0.32f,
+                        style = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round))
+                }
+                // Played: amber line with a soft glow underlay.
+                clipRect(left = 0f, top = 0f, right = boundary, bottom = size.height) {
+                    drawPath(path, color = amber, alpha = 0.16f,
+                        style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round))
+                    drawPath(path, brush = Brush.horizontalGradient(listOf(amberLite, amber)),
+                        alpha = 0.92f, style = Stroke(width = 2.4.dp.toPx(), cap = StrokeCap.Round))
+                }
+                // No seek knob: progress reads from the amber→grey colour boundary of the
+                // wave itself (a dot on cy lagged behind the vertically-moving line).
             }
         }
         Spacer(Modifier.height(20.dp))
