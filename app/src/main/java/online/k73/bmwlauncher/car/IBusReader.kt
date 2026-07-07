@@ -31,8 +31,19 @@ class IBusReader(private val appContext: Context) {
     private var io: SerialInputOutputManager? = null
     private var receiver: BroadcastReceiver? = null
     @Volatile private var rxLog = 0
+    @Volatile private var typeLog = 0
 
-    private val decoder = IBusDecoder(nowMs = { System.currentTimeMillis() }) { _data.value = it }
+    private val decoder = IBusDecoder(
+        nowMs = { System.currentTimeMillis() },
+        emit = { _data.value = it },
+        // Log one example of each distinct message type so an uploaded log inventories the whole bus
+        // (this is how we decode fuel/consumption/etc. from real data).
+        onNewType = { m ->
+            if (typeLog++ < 200) {
+                AppLog.d("IBUS", "type ${m.joinToString(" ") { "%02X".format(it) }}")
+            }
+        },
+    )
 
     fun start() {
         runCatching { connect() }.onFailure { AppLog.w("IBUS", "start failed: ${it.message}") }
@@ -56,10 +67,7 @@ class IBusReader(private val appContext: Context) {
             override fun onNewData(data: ByteArray) {
                 runCatching {
                     decoder.feed(data, data.size)
-                    if (rxLog++ < 40) AppLog.d(
-                        "IBUS",
-                        "rx ${data.size}B ${data.take(20).joinToString(" ") { "%02X".format(it) }}",
-                    )
+                    if (rxLog++ < 4) AppLog.d("IBUS", "rx ${data.size}B (data flowing)")
                 }
             }
 
