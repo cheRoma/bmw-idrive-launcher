@@ -56,6 +56,22 @@ fun HomeCarousel(
     val pagerState = rememberPagerState(initialPage = startPage, pageCount = { loops * tiles.size })
 
     BoxWithConstraints(Modifier.fillMaxSize().background(c.background)) {
+        // Live map (our dark+amber style) as the backdrop, behind everything. Renders nothing if the
+        // map is unavailable → the solid c.background above shows through (the previous look).
+        MapBackground(Modifier.fillMaxSize())
+        // Scrim over the map so it recedes into a calm backdrop and the tiles / status / dots stay
+        // legible — darker at the top and bottom edges, lighter through the middle so the amber
+        // street network still reads.
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(
+                    0f to Color(0xD90A0B0D),
+                    0.30f to Color(0x8C0A0B0D),
+                    0.62f to Color(0x730A0B0D),
+                    1f to Color(0xB00A0B0D),
+                ),
+            ),
+        )
         // Center the settled tile using the REAL available width (never a hardcoded 1280dp).
         val sidePadding = (maxWidth - PageWidth) / 2
         AmbientGlow()

@@ -23,6 +23,7 @@ class MainApplication : Application() {
         if ("robolectric".equals(Build.FINGERPRINT, ignoreCase = true)) return
         runCatching {
             AppLog.d("App", "launch v${BuildConfig.VERSION_NAME}")
+            // (Map engine is MapLibre now — it self-initialises in MapBackground, no key/global init.)
             CrashHandler.install(this)
             AnrWatchdog.start(this, onHang = {
                 // Watchdog already debounces + calls this off its own thread; upload the snapshot.
