@@ -105,8 +105,12 @@ fun rememberAudioSpectrum(active: Boolean, nBands: Int): State<FloatArray?> {
                 if (fft != null) {
                     val bands = fftToBands(fft, nBands)
                     for (i in 0 until nBands) {
-                        val decayed = smoothed[i] * DECAY
-                        smoothed[i] = if (bands[i] > decayed) bands[i] else decayed
+                        val target = bands[i]
+                        // Gentle rise + slow fall = calm "breathing" rather than a jittery jump.
+                        smoothed[i] = if (target > smoothed[i])
+                            smoothed[i] + (target - smoothed[i]) * ATTACK
+                        else
+                            smoothed[i] * DECAY
                     }
                     out.value = smoothed.copyOf()
                 }
@@ -116,4 +120,5 @@ fun rememberAudioSpectrum(active: Boolean, nBands: Int): State<FloatArray?> {
     return out
 }
 
-private const val DECAY = 0.86f
+private const val DECAY = 0.90f    // slow fall — bars glide down, don't snap
+private const val ATTACK = 0.30f   // gentle rise — calm breathing, not a jitter

@@ -26,7 +26,8 @@
             android:name=".ui.HomeActivity"
             android:exported="true"
             android:launchMode="singleTask"
-            android:stateNotNeeded="true">
+            android:stateNotNeeded="true"
+            android:configChanges="uiMode|orientation|screenSize|smallestScreenSize|screenLayout|density|keyboardHidden|navigation|keyboard">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.HOME" />
