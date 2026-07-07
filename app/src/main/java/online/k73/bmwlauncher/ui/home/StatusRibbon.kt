@@ -53,24 +53,17 @@ fun StatusRibbon(time: String, date: String, temp: String?, modifier: Modifier =
                 fontSize = TypeTokens.body,
                 modifier = Modifier.weight(1f),
             )
+            // Live outside temperature from the car's I-Bus (replaces the X5 badge). Hidden until a
+            // reading arrives.
             if (temp != null) {
                 Text(
                     temp,
                     color = c.text,
                     fontFamily = Inter,
-                    fontSize = 17.sp,
-                    modifier = Modifier.padding(end = 16.dp),
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 19.sp,
                 )
             }
-            RoundelIcon(Modifier.size(29.dp))
-            Text(
-                "X5",
-                color = c.text,
-                fontFamily = Inter,
-                fontSize = TypeTokens.label,
-                style = TextStyle(letterSpacing = 0.14.em),
-                modifier = Modifier.padding(start = 8.dp),
-            )
         }
         // amber gradient underline
         Box(

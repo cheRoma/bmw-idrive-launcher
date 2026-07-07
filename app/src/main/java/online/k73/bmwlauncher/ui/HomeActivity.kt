@@ -50,6 +50,7 @@ import online.k73.bmwlauncher.music.NotificationAccess
 import online.k73.bmwlauncher.music.ui.MusicScreen
 import online.k73.bmwlauncher.theme.ThemeResolver
 import online.k73.bmwlauncher.ui.apps.AppsScreen
+import online.k73.bmwlauncher.car.IBusService
 import online.k73.bmwlauncher.ui.bordcomputer.BordComputerScreen
 import online.k73.bmwlauncher.ui.home.HomeCarousel
 import online.k73.bmwlauncher.ui.home.TileId
@@ -290,9 +291,12 @@ class HomeActivity : ComponentActivity() {
                 val nav = rememberNavController()
                 NavHost(nav, startDestination = "home") {
                     composable("home") {
+                        // Live outside temperature from the shared I-Bus reader → status bar.
+                        val ibus = remember { IBusService.get(applicationContext) }
+                        val bord by ibus.data.collectAsState()
                         HomeCarousel(
                             now = nowDateTime,
-                            temp = null, // wired to the Microntek outside-temp broadcast later
+                            temp = bord.outsideC?.let { "$it°" },
                             onTile = { id ->
                                 AppLog.d("NAV", "tile tapped: $id")
                                 when (id) {
