@@ -24,7 +24,7 @@ class MainApplication : Application() {
         runCatching {
             AppLog.d("App", "launch v${BuildConfig.VERSION_NAME}")
             CrashHandler.install(this)
-            AnrWatchdog.start(onHang = {
+            AnrWatchdog.start(this, onHang = {
                 // Watchdog already debounces + calls this off its own thread; upload the snapshot.
                 diagScope.launch { runCatching { LogUploader.upload(this@MainApplication, "anr") } }
             })
