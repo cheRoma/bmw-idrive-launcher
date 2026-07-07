@@ -14,9 +14,16 @@ package online.k73.bmwlauncher.car
  *  - `0x19` temps:      outside_°C = signed data[0],  coolant_°C = signed data[1]
  *  - `0x11` ignition:   bit0 = ignition on
  */
-class IBusDecoder(private val nowMs: () -> Long, private val emit: (BordData) -> Unit) {
+class IBusDecoder(
+    private val nowMs: () -> Long,
+    private val emit: (BordData) -> Unit,
+    /** Called once per DISTINCT (src, command) message type — one example frame each. Lets the log
+     *  capture a full inventory of what the car broadcasts (for decoding fuel/consumption/etc.). */
+    private val onNewType: (IntArray) -> Unit = {},
+) {
     private val buf = ArrayDeque<Int>()
     private var cur = BordData(connected = true)
+    private val seenTypes = HashSet<Int>()
 
     /** Raw messages, most-recent last — a small ring for on-car diagnostics (hex dump). */
     val recentFrames = ArrayDeque<IntArray>()
@@ -42,6 +49,8 @@ class IBusDecoder(private val nowMs: () -> Long, private val emit: (BordData) ->
             }
             repeat(total) { buf.removeFirst() }
             remember(msg)
+            val typeKey = (msg[0] shl 8) or (if (msg.size > 3) msg[3] else 0xFFF)
+            if (seenTypes.add(typeKey)) onNewType(msg)
             handle(msg)
         }
     }

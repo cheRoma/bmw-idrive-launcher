@@ -9,7 +9,7 @@ class IBusDecoderTest {
 
     private fun decodeLast(vararg frames: ByteArray): BordData? {
         var last: BordData? = null
-        val d = IBusDecoder(nowMs = { 0L }) { last = it }
+        val d = IBusDecoder(nowMs = { 0L }, emit = { last = it })
         frames.forEach { d.feed(it, it.size) }
         return last
     }
