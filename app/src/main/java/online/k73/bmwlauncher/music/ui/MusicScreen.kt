@@ -332,6 +332,8 @@ private fun EqualizerProgress(np: NowPlaying, onSeek: (Long) -> Unit) {
     // Running clock that freezes when paused (the effect cancels → tMs stops advancing → bars hold).
     var tMs by remember { mutableStateOf(0L) }
     LaunchedEffect(np.isPlaying) { if (np.isPlaying) while (true) withFrameMillis { tMs = it } }
+    // Live spectrum from the global output mix; null ⇒ Visualizer unavailable ⇒ synthetic fallback.
+    val spectrum by rememberAudioSpectrum(active = np.isPlaying, nBands = 22)
     Column(Modifier.fillMaxWidth().padding(horizontal = 64.dp)) {
         Box(
             Modifier.fillMaxWidth().height(64.dp).then(
@@ -353,19 +355,31 @@ private fun EqualizerProgress(np: NowPlaying, onSeek: (Long) -> Unit) {
             Canvas(Modifier.fillMaxSize()) {
                 val w = size.width
                 val cy = size.height / 2f
-                val stepPx = 5.3.dp.toPx()
-                val barW = 2.7.dp.toPx()
-                val r = 1.3.dp.toPx()
+                val stepPx = 4.2.dp.toPx()   // thinner + airier than v4 (was 5.3)
+                val barW = 1.6.dp.toPx()     // slimmer bars (was 2.7)
+                val r = 0.8.dp.toPx()
+                val floorH = 4.dp.toPx()
+                val maxH = 44.dp.toPx()
                 val boundary = w * shown
-                val count = (w / stepPx).toInt()
+                val count = (w / stepPx).toInt().coerceAtLeast(1)
+                val spec = spectrum
                 for (i in 0 until count) {
                     val x = i * stepPx + stepPx / 2f
                     if (x > boundary) break
-                    val baseDp = (14f + abs(sin(i * 0.9f) * 26f + sin(i * 0.37f) * 14f)) * 2f / 3f
-                    val baseH = baseDp.dp.toPx()
-                    val phase = (tMs - (i * 53) % 400).toFloat() / (420 + (i * 37) % 240).toFloat()
-                    val amp = 0.625f + 0.375f * sin(phase * 2f * PI.toFloat() + i)
-                    val bh = baseH * amp.coerceIn(0.25f, 1f)
+                    val bh = if (spec != null && spec.isNotEmpty()) {
+                        // Live audio: interpolate the spectrum envelope across bars (bass→treble).
+                        val f = i.toFloat() / count * spec.size
+                        val b0 = f.toInt().coerceIn(0, spec.size - 1)
+                        val b1 = (b0 + 1).coerceIn(0, spec.size - 1)
+                        val level = (spec[b0] + (spec[b1] - spec[b0]) * (f - b0)).coerceIn(0f, 1f)
+                        floorH + level * (maxH - floorH)
+                    } else {
+                        // Fallback: synthetic per-bar shape + time pulse (freezes when paused).
+                        val baseH = ((14f + abs(sin(i * 0.9f) * 26f + sin(i * 0.37f) * 14f)) * 2f / 3f).dp.toPx()
+                        val phase = (tMs - (i * 53) % 400).toFloat() / (420 + (i * 37) % 240).toFloat()
+                        val amp = (0.625f + 0.375f * sin(phase * 2f * PI.toFloat() + i)).coerceIn(0.25f, 1f)
+                        baseH * amp
+                    }
                     drawRoundRect(
                         brush = Brush.verticalGradient(listOf(amberLite, amber), startY = cy - bh / 2, endY = cy + bh / 2),
                         topLeft = Offset(x - barW / 2, cy - bh / 2),
