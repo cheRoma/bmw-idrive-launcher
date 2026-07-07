@@ -355,46 +355,53 @@ private fun EqualizerProgress(np: NowPlaying, onSeek: (Long) -> Unit) {
             Canvas(Modifier.fillMaxSize()) {
                 val w = size.width
                 val cy = size.height / 2f
-                val stepPx = 4.2.dp.toPx()   // thinner + airier than v4 (was 5.3)
-                val barW = 1.6.dp.toPx()     // slimmer bars (was 2.7)
-                val r = 0.8.dp.toPx()
-                val floorH = 4.dp.toPx()
-                val maxH = 44.dp.toPx()
+                // Full-width spectrum analyzer: bars span the WHOLE width and dance to the music.
+                // Progress is shown by colour — played = amber, ahead = dim grey — with the knob
+                // riding the boundary. Discrete, well-spaced bars with deep valleys (gamma) so it
+                // reads as bouncing bars, never a solid "growing bar".
+                val stepPx = 7.dp.toPx()
+                val barW = 2.dp.toPx()   // thinner, more elegant
+                val r = 1.dp.toPx()
+                val floorH = 2.5.dp.toPx()
+                val maxH = 24.dp.toPx()   // low amplitude — ambient ripple, not a jumping EQ
+                val fadeW = w * 0.12f     // opacity taper at both ends
                 val boundary = w * shown
                 val count = (w / stepPx).toInt().coerceAtLeast(1)
                 val spec = spectrum
+                val greyHi = Color(0xFF9AA0A6)
+                val greyLo = Color(0xFF5A5F65)
                 for (i in 0 until count) {
                     val x = i * stepPx + stepPx / 2f
-                    if (x > boundary) break
-                    val bh = if (spec != null && spec.isNotEmpty()) {
+                    val level = if (spec != null && spec.isNotEmpty()) {
                         // Live audio: interpolate the spectrum envelope across bars (bass→treble).
                         val f = i.toFloat() / count * spec.size
                         val b0 = f.toInt().coerceIn(0, spec.size - 1)
                         val b1 = (b0 + 1).coerceIn(0, spec.size - 1)
-                        val level = (spec[b0] + (spec[b1] - spec[b0]) * (f - b0)).coerceIn(0f, 1f)
-                        floorH + level * (maxH - floorH)
+                        (spec[b0] + (spec[b1] - spec[b0]) * (f - b0)).coerceIn(0f, 1f)
                     } else {
                         // Fallback: synthetic per-bar shape + time pulse (freezes when paused).
-                        val baseH = ((14f + abs(sin(i * 0.9f) * 26f + sin(i * 0.37f) * 14f)) * 2f / 3f).dp.toPx()
                         val phase = (tMs - (i * 53) % 400).toFloat() / (420 + (i * 37) % 240).toFloat()
-                        val amp = (0.625f + 0.375f * sin(phase * 2f * PI.toFloat() + i)).coerceIn(0.25f, 1f)
-                        baseH * amp
+                        val base = 0.30f + 0.30f * abs(sin(i * 0.7f))
+                        (base * (0.55f + 0.45f * sin(phase * 2f * PI.toFloat() + i))).coerceIn(0f, 1f)
                     }
+                    val lv = level * level                       // gamma → deep valleys, lively peaks
+                    val bh = floorH + lv * (maxH - floorH)
+                    val played = x <= boundary
+                    val edge = (minOf(x, w - x) / fadeW).coerceIn(0f, 1f)   // fade at the ends
+                    val brush = if (played)
+                        Brush.verticalGradient(listOf(amberLite, amber), startY = cy - bh / 2, endY = cy + bh / 2)
+                    else
+                        Brush.verticalGradient(listOf(greyHi, greyLo), startY = cy - bh / 2, endY = cy + bh / 2)
                     drawRoundRect(
-                        brush = Brush.verticalGradient(listOf(amberLite, amber), startY = cy - bh / 2, endY = cy + bh / 2),
+                        brush = brush,
                         topLeft = Offset(x - barW / 2, cy - bh / 2),
                         size = Size(barW, bh),
                         cornerRadius = CornerRadius(r, r),
+                        alpha = (if (played) 0.82f else 0.30f) * edge,   // muted amber + edge fade
                     )
                 }
-                drawRoundRect(
-                    color = Color.White.copy(alpha = 0.22f),
-                    topLeft = Offset(boundary, cy - 2.dp.toPx()),
-                    size = Size((w - boundary).coerceAtLeast(0f), 4.dp.toPx()),
-                    cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx()),
-                )
-                drawCircle(amber.copy(alpha = 0.25f), radius = 15.5.dp.toPx(), center = Offset(boundary, cy))
-                drawCircle(amber, radius = 11.5.dp.toPx(), center = Offset(boundary, cy))
+                drawCircle(amber.copy(alpha = 0.22f), radius = 13.dp.toPx(), center = Offset(boundary, cy))
+                drawCircle(amber, radius = 9.5.dp.toPx(), center = Offset(boundary, cy))
             }
         }
         Spacer(Modifier.height(20.dp))
