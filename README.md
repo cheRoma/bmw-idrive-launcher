@@ -54,9 +54,9 @@ This project is a from-scratch replacement: own it, maintain it, make it feel li
 
 > These are the app's actual rendered UI, captured by the [Paparazzi](https://github.com/cashapp/paparazzi) screenshot tests at the head unit's native 1280×720.
 
-| Home — iDrive 3D carousel | Music — Yandex now-playing |
+| Home — iDrive 3D carousel | Music — player v4 (cover bg + live equalizer) |
 |---|---|
-| ![Home](screenshots/home.png) | ![Music](screenshots/music.png) |
+| ![Home](screenshots/home.png) | ![Music player v4](screenshots/music-player-v4.png) |
 
 | Apps | Settings |
 |---|---|
@@ -73,10 +73,13 @@ This project is a from-scratch replacement: own it, maintain it, make it feel li
 - A **status ribbon** (clock · full Russian date · outside temp · BMW-style quadrant emblem · "X5") and a breathing **amber ambient glow**.
 - **Page-indicator strips** that scale to any number of tiles.
 
-### Music — Yandex Music now-playing
+### Music — Yandex Music now-playing (player screen v4)
 - Controls **Yandex Music** via the Android `MediaSession` / `MediaController` framework (no reverse-engineering) using a `NotificationListenerService`.
-- Real **track / artist / album art / position / duration / play state**, a **tap-and-drag seek bar**, transport controls, and a like button.
-- Cold-start: if nothing is playing, one tap launches Yandex Music.
+- **v4 player screen:** the **album cover fills the whole background** (scrim + vignette keep text legible); the **elapsed portion of the progress bar is a live amber equalizer** — bars animate while playing and freeze on pause. Transport row is *shuffle · prev · play/pause · next · like*, with a tap-and-drag seek bar.
+- **Reliable cold-start:** opening Music auto-wakes Yandex; if a fully-killed app won't resume in the background, an explicit **"Включить музыку"** button foreground-launches it so «Моя волна» starts, then drops you back on the now-playing screen.
+
+### YouTube — behind a per-app VPN
+- A **YouTube** tile that opens the app. YouTube is throttled/blocked in Russia, so it runs behind a **DPI-bypassing VPN** (VLESS + Reality via [sing-box](https://sing-box.sagernet.org/)) configured as an **always-on, _per-app_ `VpnService`** — only YouTube's traffic egresses through the tunnel; everything else (Yandex, navigation) stays direct. No runtime root needed. Design: [`youtube-vpn-design.md`](docs/superpowers/specs/2026-07-06-youtube-vpn-design.md).
 
 ### Bort-computer (i-Bus) autostart — the killer feature
 - On boot the launcher **autostarts the i-Bus app** so it connects to the car, then brings itself back to the front — with animations suppressed so the i-Bus app doesn't flash on screen.
@@ -109,6 +112,16 @@ This project is a from-scratch replacement: own it, maintain it, make it feel li
 | **Car integration** | i-Bus app + Resler USB→I-Bus adapter |
 
 > **Design note:** everything is laid out in **dp** for the real 853 dp-wide screen. Screenshot tests deliberately render at 1280 px / mdpi (so `dp == px`) to pin the layout to the mockups.
+
+---
+
+## Enabling ADB on these head units — the `adbon` password
+
+Developing on this class of unit has one nasty gotcha: the normal *"tap Build number 7×"* trick **does nothing**, and *Developer Options* never appears — the About screen only exposes an MCU version like **`if2 - V2`**. The undocumented fix is to open the unit's **Factory Settings** and type **`adbon`** as the password, which unlocks Developer Options / ADB. From there, **Wireless debugging** works with no USB cable, and because the ROM is a `userdebug` build, **`adb root` works**.
+
+It took a full evening to reverse-engineer, so it's written up as a standalone guide for anyone with a **XTRONS / Microntek / HCT / MTCE** unit:
+
+📄 **[Enabling ADB / Developer Options on Chinese Android head units (`adbon`)](docs/ENABLING-ADB-HCT-HEADUNITS.md)**
 
 ---
 
@@ -235,6 +248,10 @@ The app self-updates so improvements ship without a flash drive:
 
 | Version | Highlights |
 |---|---|
+| **1.5.7** | **YouTube tile** (opens behind a per-app DPI-bypassing VPN, provisioned on-device) |
+| **1.5.6** | **Player screen v4** — album cover background + **live amber equalizer** progress, new shuffle·prev·play·next·like transport |
+| **1.5.5** | Reliable Yandex **cold-start** — auto-wake on entry, bounded nudges, foreground fallback |
+| **1.5.0–1.5.4** | In-app diagnostics (event log, crash/ANR capture, one-tap upload), cold-start polish, grey-empty-Music fix |
 | **1.4.x** | **Claude-Design redesign** — filled icon-centric carousel cards, envelope album art, working back navigation, reliable "make default launcher", darker palette + Inter typography, triple press-feedback |
 | **1.3.x** | iDrive 3D carousel home + on-device tuning (centering on real width, size, contrast) |
 | **1.2.x** | Adaptive launcher icon, default-launcher setting, Music seek + like, i-Bus flash removal |
@@ -257,6 +274,7 @@ The app self-updates so improvements ship without a flash drive:
 - **Non-root by design.** Some things a rooted launcher could do (fully silent installs, forcing default HOME) are done the polite, user-confirmed way instead.
 - The head unit's LCD lifts near-black toward a lit blue-grey — full-dark screens photograph bluer than they render.
 - Yandex Music integration is limited to what its `MediaSession` exposes (transport + now-playing are guaranteed; library browsing is not).
+- **No _persistent_ on-device root.** The ROM has no `su`/Magisk (and no accessible USB for `fastboot`), so ADB root exists only over a live connection — see the [`adbon` guide](docs/ENABLING-ADB-HCT-HEADUNITS.md). This is why the YouTube VPN uses an always-on `VpnService` rather than a root-managed tunnel.
 
 ---
 
