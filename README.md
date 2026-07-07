@@ -4,7 +4,7 @@
 
 **A custom Android home-screen launcher that turns a cheap aftermarket head unit into a premium, BMW-iDrive-style car interface.**
 
-Built for a **2005 BMW X5 (E53)** running an **XTRONS** Android head unit, this launcher replaces the sluggish factory desktop with a fast, touch-first UI inspired by modern **iDrive**: a 3D tile carousel, an instrument-amber accent on near-black graphite, a now-playing screen wired to **Yandex Music**, guaranteed autostart of the **i-Bus** trip-computer app, in-app OTA updates, and one-tap reboot — all in **Kotlin + Jetpack Compose**, screenshot-tested, no root required.
+Built for a **2005 BMW X5 (E53)** running an **XTRONS** Android head unit, this launcher replaces the sluggish factory desktop with a fast, touch-first UI inspired by modern **iDrive**: a 3D tile carousel over a **live map background**, an instrument-amber accent on near-black graphite, a now-playing screen wired to **Yandex Music**, and a **from-scratch on-board computer that reads the car's BMW I-Bus directly over USB** — plus in-app OTA updates and one-tap reboot. All in **Kotlin + Jetpack Compose**, screenshot-tested, no root required.
 
 <p align="center">
   <img src="screenshots/home.png" alt="Home carousel" width="88%">
@@ -34,19 +34,16 @@ Built for a **2005 BMW X5 (E53)** running an **XTRONS** Android head unit, this 
 
 ## Why
 
-The factory launcher shipped on these XTRONS units (an abandoned third-party "iDrive Launcher") is laggy, unmaintained, and doesn't reliably do the two things that matter in an E53 retrofit:
+The factory launcher shipped on these XTRONS units (an abandoned third-party "iDrive Launcher") is laggy and unmaintained.
 
-1. **Autostart the i-Bus app** on boot, so the car's trip-computer / steering-wheel integration comes up automatically (it talks to the car over a Resler USB→I-Bus adapter).
-2. **Get out of the way** — a fast, glanceable home screen you can operate at 70–90 cm while driving.
-
-This project is a from-scratch replacement: own it, maintain it, make it feel like a real BMW.
+This started as a from-scratch replacement whose main job was to **autostart a proprietary third-party i-Bus app** (the car's trip computer) and get out of the way. It has since grown into a full stack: the launcher now **reads the car's I-Bus itself** over the Resler USB adapter — so that third-party app is **gone entirely** — and renders a fast, glanceable home you can operate at 70–90 cm while driving.
 
 **Design goals**
 
 - **Fast & responsive** — no jank on a low-end Qualcomm SoC.
 - **Touch-first** — the E53 has no rotary controller, only the XTRONS touchscreen.
 - **BMW surface language** — instrument-illumination amber on graphite, iDrive-style depth.
-- **Rock-solid i-Bus autostart** + a **reboot** button + **self-update** so it can be improved without a flash drive.
+- **Own the whole stack** — trip computer, updates, reboot — so nothing depends on an abandoned third-party app, and it can all be improved over the air without a flash drive.
 
 ---
 
@@ -54,7 +51,7 @@ This project is a from-scratch replacement: own it, maintain it, make it feel li
 
 > These are the app's actual rendered UI, captured by the [Paparazzi](https://github.com/cashapp/paparazzi) screenshot tests at the head unit's native 1280×720.
 
-| Home — iDrive 3D carousel | Music — player v4 (cover bg + live equalizer) |
+| Home — iDrive 3D carousel (over a live map) | Music — player v4 (cover bg + calm seek bar) |
 |---|---|
 | ![Home](screenshots/home.png) | ![Music player v4](screenshots/music-player-v4.png) |
 
@@ -70,26 +67,34 @@ This project is a from-scratch replacement: own it, maintain it, make it feel li
 - An **infinitely-looping, cylindrical 3D carousel** of large tiles (iDrive-2016 style): the centered tile is flat, focused, amber-bordered and glowing; side tiles turn away in perspective, shrink, and dim.
 - **Icon-dominant** filled graphite cards; whole-tile tap.
 - The 3D "feel" is driven entirely by a pure, unit-tested `CarouselGeometry` — rotation / scale / opacity per position — so it's tunable and re-shippable over the air without touching Compose.
-- A **status ribbon** (clock · full Russian date · outside temp · BMW-style quadrant emblem · "X5") and a breathing **amber ambient glow**.
+- A **status ribbon** (clock · full Russian date · **live outside temperature read from the car's I-Bus**) and a breathing **amber ambient glow**.
 - **Page-indicator strips** that scale to any number of tiles.
+- The carousel floats over a **live map background** (see below).
+
+### Live map background
+- The home screen sits over a **live map that follows the car's GPS** — dark land, dark-teal water, amber roads, no labels: styled to match the launcher, not a stock map.
+- Rendered by **MapLibre GL** from free **OpenFreeMap** vector tiles — **no API key, no Google Play Services**. The **style is a JSON file hosted on our own server**, so colours are re-tuned without shipping a new build.
+- Tiles are **proxied through our own host** (the head unit's ISP can't reach the tile CDN directly, but it can always reach our server), and a dark scrim keeps the tiles/clock legible over the map. Gestures are disabled — it's a backdrop, not a map you touch.
 
 ### Music — Yandex Music now-playing (player screen v4)
 - Controls **Yandex Music** via the Android `MediaSession` / `MediaController` framework (no reverse-engineering) using a `NotificationListenerService`.
-- **v4 player screen:** the **album cover fills the whole background** (scrim + vignette keep text legible); the **elapsed portion of the progress bar is a live amber equalizer** — bars animate while playing and freeze on pause. Transport row is *shuffle · prev · play/pause · next · like*, with a tap-and-drag seek bar.
+- **v4 player screen:** the **album cover fills the whole background** (scrim + vignette keep text legible); a **calm amber seek bar** shows progress. Transport row is *shuffle · prev · play/pause · next · like*, with a tap-and-drag seek. *(An earlier animated "equalizer" was dropped: the head-unit ROM blocks audio capture, so any analyzer was necessarily synthetic and read as fake.)*
 - **Reliable cold-start:** opening Music auto-wakes Yandex; if a fully-killed app won't resume in the background, an explicit **"Включить музыку"** button foreground-launches it so «Моя волна» starts, then drops you back on the now-playing screen.
 
 ### YouTube — behind a per-app VPN
 - A **YouTube** tile that opens the app. YouTube is throttled/blocked in Russia, so it runs behind a **DPI-bypassing VPN** (VLESS + Reality via [sing-box](https://sing-box.sagernet.org/)) configured as an **always-on, _per-app_ `VpnService`** — only YouTube's traffic egresses through the tunnel; everything else (Yandex, navigation) stays direct. No runtime root needed. Design: [`youtube-vpn-design.md`](docs/superpowers/specs/2026-07-06-youtube-vpn-design.md).
 
-### Bort-computer (i-Bus) autostart — the killer feature
-- On boot the launcher **autostarts the i-Bus app** so it connects to the car, then brings itself back to the front — with animations suppressed so the i-Bus app doesn't flash on screen.
-- Fully **non-root** (uses foreground-HOME activity starts + task reordering), with a retry-friendly, once-per-process state machine.
+### On-board computer — reads the car's I-Bus directly
+- A **from-scratch trip computer**: the launcher talks to the car's **BMW I-Bus** over the Resler **CP210x USB-serial** adapter (9600 8E1, via `usb-serial-for-android`) and decodes the IKE instrument-cluster broadcasts itself — **speed, RPM, coolant & outside temperature, ignition** — and shows them on a native screen in the launcher's own style.
+- The I-Bus framing + decode is a **pure, unit-tested** `IBusDecoder`; a single **process-wide reader** feeds both the trip-computer screen and the **live outside-temperature** in the home status bar (the BC opens already connected).
+- This **replaced** the old approach of autostarting a proprietary i-Bus app, which was flaky and fought over the single-owner USB port. That app is **uninstalled** — we own the adapter. The reader logs one example of every distinct bus message type, so new gauges (fuel, consumption, trip averages) can be decoded from a real drive.
+- Everything USB is **guarded** — no adapter / no permission just shows a "no adapter" state; the HOME app must never crash.
 
 ### Apps drawer
 - A grid of installed apps (real launcher icons from `PackageManager`) plus a dedicated, cordoned-off **Reboot** tile (tap-to-confirm).
 
 ### Settings
-- **i-Bus autostart** toggle, **bring-launcher-to-front** toggle, **Day / Night / Auto** theme segment control, **default-app** display, a **"Make default launcher"** action, and the **in-app updater**.
+- **Day / Night / Auto** theme segment control, **default-app** display, a **"Make default launcher"** action, the **in-app updater**, and one-tap **diagnostic-log upload**.
 
 ### Reboot without root
 - Reboots this Microntek/HCT ROM via a vendor broadcast (`com.microntek.hctreboot`) — confirmed working from an unprivileged app, no `su` needed.
@@ -109,7 +114,7 @@ This project is a from-scratch replacement: own it, maintain it, make it feel li
 | **SoC** | Qualcomm QCM6125 |
 | **Root** | **No** (the entire app is designed to be non-root) |
 | **Screen** | 1280×720 px @ 240 dpi → **853×480 dp**, landscape, capacitive touch (no rotary encoder) |
-| **Car integration** | i-Bus app + Resler USB→I-Bus adapter |
+| **Car integration** | our own I-Bus reader over the Resler **CP210x USB→I-Bus** adapter |
 
 > **Design note:** everything is laid out in **dp** for the real 853 dp-wide screen. Screenshot tests deliberately render at 1280 px / mdpi (so `dp == px`) to pin the layout to the mockups.
 
@@ -154,17 +159,20 @@ Plain **Kotlin + Jetpack Compose**, no DI framework, small and legible. Logic th
 
 ```
 HomeActivity (single Compose Activity, declared as HOME)
- ├─ NavHost: home · music · apps · settings
+ ├─ NavHost: home · music · apps · settings · bordcomputer
  ├─ SettingsStore (DataStore)         — persisted prefs
- ├─ AutostartController               — non-root i-Bus autostart state machine
  ├─ AppLauncher / InstalledApps       — launch + enumerate apps
  ├─ RootShell / ShellCommands         — root-adaptive (works without root)
+ ├─ car/    IBusDecoder (pure, unit-tested) · IBusReader (CP210x USB) ·
+ │          IBusService (process-wide singleton) · BordData
+ ├─ diag/   AppLog · CrashHandler · AnrWatchdog · LogUploader
  ├─ update/ (UpdateChecker, ApkDownloader, ApkInstaller, RootDetector)
  └─ music/ (MediaSessionRepository, MusicController, MusicViewModel,
             MediaNotificationListener, PlaybackMapper, NowPlaying)
 ui/
  ├─ home/   CarouselGeometry · HomeCarousel · TileCard · StatusRibbon ·
- │          RibbonClock · RoundelIcon · AmbientGlow · PageIndicator
+ │          RibbonClock · AmbientGlow · PageIndicator · MapBackground (MapLibre)
+ ├─ bordcomputer/ BordComputerScreen
  ├─ apps/   AppsScreen
  ├─ settings/ SettingsScreen
  └─ theme/  Color · Theme · Type · Pressable · ScreenHeader
@@ -248,6 +256,11 @@ The app self-updates so improvements ship without a flash drive:
 
 | Version | Highlights |
 |---|---|
+| **1.6.10** | On-board computer logs one example of **every distinct I-Bus message type** — groundwork for fuel / consumption / trip averages |
+| **1.6.9** | **Live outside temperature** on the home status bar (replaces the X5 emblem); one shared process-wide I-Bus reader |
+| **1.6.6–1.6.8** | **Own on-board computer** — reads the BMW I-Bus over the CP210x USB adapter (speed · RPM · coolant · outside temp); i-Bus app autostart removed; map tiles proxied through our own host |
+| **1.6.3–1.6.7** | **Live map home background** — MapLibre GL + OpenFreeMap, self-styled dark/amber (dropped Yandex MapKit, whose proprietary style format never applied) |
+| **1.6.0–1.6.2** | Audio-reactive equalizer experiments → **removed** for a calm seek bar (ROM blocks audio capture); reboot-durable ANR reports; gray-screen root-cause fixes |
 | **1.5.7** | **YouTube tile** (opens behind a per-app DPI-bypassing VPN, provisioned on-device) |
 | **1.5.6** | **Player screen v4** — album cover background + **live amber equalizer** progress, new shuffle·prev·play·next·like transport |
 | **1.5.5** | Reliable Yandex **cold-start** — auto-wake on entry, bounded nudges, foreground fallback |
@@ -262,10 +275,12 @@ The app self-updates so improvements ship without a flash drive:
 
 ## Roadmap
 
+- **Trip computer** — fuel level, consumption and average speed (each with reset), decoded from the I-Bus.
 - In-launcher **playlist browsing** (Yandex `MediaBrowserService`, pending device probe).
 - Reflect the **real "liked" state** from the media session.
 - A distinct, brighter **Day theme** pass.
-- **Outside-temperature** in the ribbon (from the vendor broadcast).
+
+*(Done since the roadmap was first written: live map background, our own I-Bus on-board computer, outside temperature in the ribbon.)*
 
 ---
 
@@ -280,7 +295,7 @@ The app self-updates so improvements ship without a flash drive:
 
 ## Tech stack
 
-Kotlin · Jetpack Compose (Material 3) · Navigation-Compose · DataStore · `MediaSessionManager` / `NotificationListenerService` · Coroutines · JUnit4 · Robolectric · Paparazzi · Gradle (Kotlin DSL) · adaptive icons · Inter (SIL OFL).
+Kotlin · Jetpack Compose (Material 3) · Navigation-Compose · DataStore · `MediaSessionManager` / `NotificationListenerService` · **MapLibre GL** (OpenFreeMap tiles) · **usb-serial-for-android** (CP210x / BMW I-Bus) · Coroutines · JUnit4 · Robolectric · Paparazzi · Gradle (Kotlin DSL) · adaptive icons · Inter (SIL OFL).
 
 ---
 
