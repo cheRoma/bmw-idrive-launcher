@@ -19,12 +19,14 @@ android {
         applicationId = "online.k73.bmwlauncher"
         minSdk = 26
         targetSdk = 33
-        versionCode = 30
-        versionName = "1.6.2"
+        versionCode = 36
+        versionName = "1.6.8"
 
         // Diagnostic log upload endpoint (token kept out of VCS via keystore.properties).
         buildConfigField("String", "LOG_UPLOAD_URL", "\"https://k73.online/newBMW/logs/upload\"")
         buildConfigField("String", "LOG_UPLOAD_TOKEN", "\"${keystoreProps.getProperty("logUploadToken") ?: ""}\"")
+        // Yandex MapKit key for the live map background (kept out of VCS via keystore.properties).
+        buildConfigField("String", "YANDEX_MAPKIT_KEY", "\"${keystoreProps.getProperty("yandexMapkitKey") ?: ""}\"")
     }
     signingConfigs {
         create("release") {
@@ -75,6 +77,11 @@ dependencies {
     implementation(libs.nav.compose)
     implementation(libs.datastore.prefs)
     implementation(libs.coroutines.android)
+    // MapLibre GL — decorative live map home background, rendered from our own deterministic style
+    // (map-style.json on k73.online → free OpenFreeMap tiles). No API key, no Google Play Services.
+    implementation("org.maplibre.gl:android-sdk:11.13.5")
+    // USB-serial (CP210x) for reading the car's I-Bus directly — our own on-board computer.
+    implementation("com.github.mik3y:usb-serial-for-android:3.8.1")
     debugImplementation(libs.compose.tooling)
 
     testImplementation(libs.junit)

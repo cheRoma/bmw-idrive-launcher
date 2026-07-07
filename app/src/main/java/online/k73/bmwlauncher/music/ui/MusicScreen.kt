@@ -348,7 +348,7 @@ private fun TrackProgress(np: NowPlaying, onSeek: (Long) -> Unit) {
                 val w = size.width
                 val cy = size.height / 2f
                 val boundary = (w * shown).coerceIn(0f, w)
-                val track = 5.dp.toPx()
+                val track = 2.5.dp.toPx()
                 // Full track (not yet played) — dim grey.
                 drawLine(
                     color = Color(0xFF3A3D42),
@@ -362,7 +362,7 @@ private fun TrackProgress(np: NowPlaying, onSeek: (Long) -> Unit) {
                     strokeWidth = track, cap = StrokeCap.Round,
                 )
                 // Seek knob on the boundary.
-                drawCircle(color = amber, radius = 7.dp.toPx(), center = Offset(boundary, cy))
+                drawCircle(color = amber, radius = 5.dp.toPx(), center = Offset(boundary, cy))
             }
         }
         Spacer(Modifier.height(16.dp))

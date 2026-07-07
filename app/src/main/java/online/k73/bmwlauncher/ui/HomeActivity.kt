@@ -50,6 +50,7 @@ import online.k73.bmwlauncher.music.NotificationAccess
 import online.k73.bmwlauncher.music.ui.MusicScreen
 import online.k73.bmwlauncher.theme.ThemeResolver
 import online.k73.bmwlauncher.ui.apps.AppsScreen
+import online.k73.bmwlauncher.ui.bordcomputer.BordComputerScreen
 import online.k73.bmwlauncher.ui.home.HomeCarousel
 import online.k73.bmwlauncher.ui.home.TileId
 import online.k73.bmwlauncher.ui.settings.SettingsScreen
@@ -90,6 +91,16 @@ class HomeActivity : ComponentActivity() {
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
         val res = packageManager.resolveActivity(intent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)
         return res?.activityInfo?.packageName == packageName
+    }
+
+    /** Ask once for location so the map background can follow the car. Guarded — HOME must not crash. */
+    private fun requestLocationForMap() {
+        runCatching {
+            val perm = android.Manifest.permission.ACCESS_FINE_LOCATION
+            if (checkSelfPermission(perm) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(perm, android.Manifest.permission.ACCESS_COARSE_LOCATION), 0)
+            }
+        }
     }
 
     private fun requestDefaultLauncher() {
@@ -252,6 +263,7 @@ class HomeActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         AppLog.d("HOME", "onCreate")
         enableImmersiveMode()
+        requestLocationForMap()
         // Resolve default-launcher status once up front so the first Settings visit is correct.
         isDefaultLauncherState.value = computeIsDefaultLauncher()
         // Resolve root status ONCE off the main thread; hasRoot() spawns `su` and must never
@@ -288,12 +300,15 @@ class HomeActivity : ComponentActivity() {
                                     TileId.APPS -> nav.navigate("apps")
                                     TileId.SETTINGS -> nav.navigate("settings")
                                     TileId.NAV -> launcher.launch(settings.navPackage)
-                                    TileId.IBUS -> launcher.launch(settings.iBusPackage)
+                                    TileId.IBUS -> nav.navigate("bordcomputer")
                                     TileId.CARPLAY -> launcher.launch(settings.carplayPackage)
                                     TileId.YOUTUBE -> launcher.launch("com.google.android.youtube")
                                 }
                             },
                         )
+                    }
+                    composable("bordcomputer") {
+                        BordComputerScreen(onBack = { nav.popBackStack() })
                     }
                     composable("apps") {
                         AppsScreen(
@@ -370,29 +385,7 @@ class HomeActivity : ComponentActivity() {
         // Refresh default-launcher status every resume (e.g. after returning from the system dialog).
         // Must run before the autostart early-return so it always updates.
         isDefaultLauncherState.value = computeIsDefaultLauncher()
-        // Autostart i-Bus once per process (after boot, when we first become HOME). This ROM has
-        // no root, so we launch i-Bus with a normal startActivity (allowed — we are the foreground
-        // HOME), then bring our launcher back to the front. Once-per-process so returning Home
-        // later doesn't relaunch i-Bus.
-        if (autostartHandled) return
-        autostartHandled = true
-        lifecycleScope.launch {
-            val s = store.read()
-            if (s.autostartIBus && s.iBusPackage.isNotBlank()) {
-                val ibusIntent = launcher.launchIntentFor(s.iBusPackage)?.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
-                if (ibusIntent != null) {
-                    AppLog.d("AUTOSTART", "autostart iBus: ${s.iBusPackage}")
-                    startActivity(ibusIntent)
-                    if (s.bringLauncherToFront) {
-                        kotlinx.coroutines.delay(IBUS_SETTLE_MS)
-                        AppLog.d("AUTOSTART", "bring launcher to front")
-                        startActivity(
-                            Intent(this@HomeActivity, HomeActivity::class.java)
-                                .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_NO_ANIMATION)
-                        )
-                    }
-                }
-            }
-        }
+        // i-Bus autostart REMOVED: we now read the I-Bus ourselves (our own «Борткомпьютер») and USB
+        // is single-owner — launching the OEM app would steal the adapter. The tile opens our screen.
     }
 }
