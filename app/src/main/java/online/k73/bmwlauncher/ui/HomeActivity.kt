@@ -197,11 +197,27 @@ class HomeActivity : ComponentActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
+        AppLog.d("KEY", "windowFocus=$hasFocus")
         // Re-hide the bars whenever we regain focus (they reappear after other apps / dialogs).
         if (hasFocus) {
             androidx.core.view.WindowInsetsControllerCompat(window, window.decorView)
                 .hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
         }
+    }
+
+    // Diagnostics for Roma's "physical panel buttons misbehave" report: log every hardware key the
+    // XTRONS panel delivers (keycode + whether our window had focus at press time). An uploaded drive
+    // log then shows exactly which codes the panel sends and whether they're being dropped during the
+    // wake/no-focus window (the "Cancelling event (no window focus)" symptom). Purely observational —
+    // we do NOT consume keys here (return super), so nothing changes behaviourally.
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (event.action == android.view.KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+            AppLog.d(
+                "KEY",
+                "down code=${event.keyCode} (${android.view.KeyEvent.keyCodeToString(event.keyCode)}) focus=${hasWindowFocus()}",
+            )
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     private fun launchSystemInstaller(file: java.io.File) {

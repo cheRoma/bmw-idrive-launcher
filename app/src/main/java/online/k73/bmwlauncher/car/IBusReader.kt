@@ -104,6 +104,30 @@ class IBusReader(private val appContext: Context) {
         AppLog.d("IBUS", "requesting USB permission")
     }
 
+    /**
+     * One-shot WRITE to the I-Bus: clears the BMW OBC speed limit ("LIMIT 6 KM/H") that the OEM iBus
+     * app latched into the instrument cluster and never cleared when Roma uninstalled it (→ the >6 km/h
+     * gong keeps firing). Telegram = the EXACT one the OEM app sends when its «Limit» toggle is switched
+     * OFF, decompiled from `o1.t1()`:
+     *     3B 05 80 41 09 08 FE   (src 0x3B on-board-monitor → dst 0x80 IKE, cmd 41 09, flag 08 = off;
+     *                             last byte = XOR checksum of the preceding six)
+     * Sent a few times because the bus is noisy and a single frame is easily missed. This is the ONLY
+     * write we ever perform — the reader is otherwise strictly read-only. Guarded; a missing/busy port
+     * just no-ops. Must be called off the main thread (blocking USB bulk write).
+     */
+    fun clearSpeedLimit(): Boolean {
+        val p = port ?: run { AppLog.w("IBUS", "clearSpeedLimit: no open port"); return false }
+        val frame = byteArrayOf(0x3B, 0x05, 0x80.toByte(), 0x41, 0x09, 0x08, 0xFE.toByte())
+        var ok = false
+        repeat(3) {
+            runCatching { p.write(frame, 300); ok = true }
+                .onFailure { AppLog.w("IBUS", "clearSpeedLimit write failed: ${it.message}") }
+            runCatching { Thread.sleep(120) }
+        }
+        if (ok) AppLog.d("IBUS", "sent clear-speed-limit telegram 3B 05 80 41 09 08 FE")
+        return ok
+    }
+
     fun stop() {
         runCatching { io?.stop() }
         runCatching { port?.close() }
