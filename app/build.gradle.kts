@@ -19,8 +19,8 @@ android {
         applicationId = "online.k73.bmwlauncher"
         minSdk = 26
         targetSdk = 33
-        versionCode = 38
-        versionName = "1.6.10"
+        versionCode = 42
+        versionName = "1.6.14"
 
         // Diagnostic log upload endpoint (token kept out of VCS via keystore.properties).
         buildConfigField("String", "LOG_UPLOAD_URL", "\"https://k73.online/newBMW/logs/upload\"")
@@ -82,6 +82,8 @@ dependencies {
     implementation("org.maplibre.gl:android-sdk:11.13.5")
     // USB-serial (CP210x) for reading the car's I-Bus directly — our own on-board computer.
     implementation("com.github.mik3y:usb-serial-for-android:3.8.1")
+    // MediaBrowserCompat — connect to Yandex's MediaBrowserService to start playback WITHOUT its UI
+    implementation("androidx.media:media:1.7.0")
     debugImplementation(libs.compose.tooling)
 
     testImplementation(libs.junit)

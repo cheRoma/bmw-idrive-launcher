@@ -33,6 +33,8 @@ class MusicViewModel(
 
     private var tickJob: kotlinx.coroutines.Job? = null
     private var wakeJob: kotlinx.coroutines.Job? = null
+    // Headless playback starter: connects to Yandex's MediaBrowserService (no UI flash).
+    private val browserStarter by lazy { YandexBrowserStarter(context, targetPackage) }
     // Foreground launcher (opens the Yandex app so «Моя волна» starts). Stored so the retry button
     // can trigger it; injected by the UI via [start].
     private var foregroundLauncher: ((String) -> Unit)? = null
@@ -62,15 +64,22 @@ class MusicViewModel(
         if (_coldStart.value == ColdStartPhase.WAKING) return
         AppLog.d("MUSIC", "cold-start: background wake -> $targetPackage")
         _coldStart.value = ColdStartPhase.WAKING
+        // Preferred headless wake (no Yandex UI flash): binding Yandex's MediaBrowserService starts
+        // its process and loads the last queue («Моя волна») even though it REJECTS us as a browse
+        // client — so it comes up PAUSED, and we then just nudge play(). Runs alongside the
+        // media-button; the poll below sends play() once the session binds.
+        runCatching { browserStarter.start { ok -> AppLog.d("MUSIC", "browser start issued: $ok") } }
         repo.sendPlay(targetPackage)
         wakeJob?.cancel()
         wakeJob = scope.launch {
             var tries = 0
-            while (tries < 6) { // ~3s, bounded (no infinite play() spam)
+            // A fully-killed Yandex takes ~8s to spin up + expose its (paused) session, so keep
+            // nudging play() well past that before falling back to a foreground launch.
+            while (tries < 26) { // ~13s
                 delay(500); rebind(); refresh()
                 controller?.let { ctl ->
                     if (ctl.isPlaying()) { _coldStart.value = ColdStartPhase.IDLE; return@launch }
-                    runCatching { ctl.play() } // nudge a bound-but-idle session
+                    runCatching { ctl.play() } // resume the bound-but-paused session
                 }
                 tries++
             }
@@ -100,6 +109,7 @@ class MusicViewModel(
     fun stop() {
         tickJob?.cancel(); tickJob = null
         wakeJob?.cancel(); wakeJob = null
+        runCatching { browserStarter.release() }
         callback?.let { rawController?.unregisterCallback(it) }
         sessionsListener?.let { repo.stopObserving(it) }
     }
