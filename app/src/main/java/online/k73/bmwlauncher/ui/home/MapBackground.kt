@@ -21,6 +21,7 @@ import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.maps.MapLibreMapOptions
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 
@@ -44,7 +45,14 @@ fun MapBackground(modifier: Modifier = Modifier) {
     val mapView = remember {
         runCatching {
             MapLibre.getInstance(ctx)                 // no API key needed
-            MapView(ctx).apply { onCreate(null) }
+            // TEXTURE mode (not the default SurfaceView): renders into a TextureView that composites
+            // as an ordinary view in the hierarchy. The default GL SurfaceView owns a separate surface
+            // that, on this head unit, fails to recover after the ACC sleep/wake power cycle and leaves
+            // the WHOLE launcher window black (the recurring "black screen on arrival"). A TextureView
+            // has no separate surface to lose — a stale/late GL frame just shows the solid launcher
+            // background behind it, never a black window.
+            val options = MapLibreMapOptions.createFromAttributes(ctx).textureMode(true)
+            MapView(ctx, options).apply { onCreate(null) }
         }.getOrNull()
     } ?: return
 
