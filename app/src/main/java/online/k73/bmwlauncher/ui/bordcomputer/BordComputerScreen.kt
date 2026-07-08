@@ -16,7 +16,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,6 +40,8 @@ fun BordComputerScreen(onBack: () -> Unit = {}) {
     // Shared process-wide reader (also feeds the home status bar) — already connected, no start/stop here.
     val reader = remember { IBusService.get(appCtx) }
     val data by reader.data.collectAsState()
+    val scope = rememberCoroutineScope()
+    var limitMsg by remember { mutableStateOf<String?>(null) }
 
     Column(Modifier.fillMaxSize().background(c.background).padding(horizontal = 40.dp, vertical = 24.dp)) {
         // Top bar
@@ -68,6 +74,35 @@ fun BordComputerScreen(onBack: () -> Unit = {}) {
                 StatCell("Двигатель", data.coolantC?.let { "$it°" } ?: "—", "ОЖ", Modifier.weight(1f))
                 StatCell("За бортом", data.outsideC?.let { "$it°" } ?: "—", "C", Modifier.weight(1f))
             }
+        }
+
+        Spacer(Modifier.weight(1f))
+
+        // One-tap fix for the ">6 km/h gong": clears the OBC "LIMIT 6 KM/H" the removed OEM iBus app
+        // latched into the cluster. Sends the exact clear telegram the OEM app used (see IBusReader).
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(999.dp))
+                .background(c.tile)
+                .clickable(enabled = data.connected) {
+                    limitMsg = "Отправляю…"
+                    scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        val ok = reader.clearSpeedLimit()
+                        limitMsg = if (ok) "Лимит сброшен — проверьте в поездке" else "Нет связи с I-Bus"
+                    }
+                }
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            androidx.compose.material3.Text(
+                "Сбросить лимит скорости",
+                color = if (data.connected) c.accent else c.textTertiary,
+                fontFamily = Inter, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+            )
+        }
+        limitMsg?.let {
+            Spacer(Modifier.height(8.dp))
+            androidx.compose.material3.Text(it, color = c.textDim, fontFamily = Inter, fontSize = 13.sp)
         }
     }
 }

@@ -14,4 +14,7 @@ object IBusService {
         reader ?: synchronized(this) {
             reader ?: IBusReader(context.applicationContext).also { it.start(); reader = it }
         }
+
+    /** Clear the latched OBC "LIMIT 6 KM/H" from the cluster. Call off the main thread. */
+    fun clearSpeedLimit(context: Context): Boolean = get(context).clearSpeedLimit()
 }
