@@ -20,10 +20,17 @@ class IBusDecoder(
     /** Called once per DISTINCT (src, command) message type — one example frame each. Lets the log
      *  capture a full inventory of what the car broadcasts (for decoding fuel/consumption/etc.). */
     private val onNewType: (IntArray) -> Unit = {},
+    /** When [pdcCapture] is on, EVERY frame to/from the PDC module (0x60) is delivered here — the raw
+     *  sequence (unlike onNewType's one-per-type) needed to decode the parking distances, which BMW
+     *  doesn't publish. Toggled on for a reversing session, then off. */
+    private val onPdcFrame: (IntArray) -> Unit = {},
 ) {
     private val buf = ArrayDeque<Int>()
     private var cur = BordData(connected = true)
     private val seenTypes = HashSet<Int>()
+
+    /** PDC capture toggle — see [onPdcFrame]. */
+    var pdcCapture = false
 
     /** Raw messages, most-recent last — a small ring for on-car diagnostics (hex dump). */
     val recentFrames = ArrayDeque<IntArray>()
@@ -49,6 +56,7 @@ class IBusDecoder(
             }
             repeat(total) { buf.removeFirst() }
             remember(msg)
+            if (pdcCapture && (msg[0] == 0x60 || msg[2] == 0x60)) onPdcFrame(msg)
             val typeKey = (msg[0] shl 8) or (if (msg.size > 3) msg[3] else 0xFFF)
             if (seenTypes.add(typeKey)) onNewType(msg)
             handle(msg)

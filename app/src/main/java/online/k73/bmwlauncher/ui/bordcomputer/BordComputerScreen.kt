@@ -127,6 +127,32 @@ fun BordComputerScreen(onBack: () -> Unit = {}) {
             Spacer(Modifier.height(8.dp))
             androidx.compose.material3.Text(it, color = c.textDim, fontFamily = Inter, fontSize = 13.sp)
         }
+
+        // PDC capture (diagnostic): logs every raw parking-module (0x60) frame so a reversing session
+        // can be decoded offline → then we build the early beep. Turn on, reverse toward a wall, turn
+        // off, and send logs from Настройки.
+        val pdcOn by reader.pdcCapturing.collectAsState()
+        Spacer(Modifier.height(10.dp))
+        Box(
+            Modifier
+                .clip(RoundedCornerShape(999.dp))
+                .background(if (pdcOn) c.accent.copy(alpha = 0.16f) else c.tile)
+                .clickable(enabled = data.connected) { reader.setPdcCapture(!pdcOn) }
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+        ) {
+            androidx.compose.material3.Text(
+                if (pdcOn) "● Идёт запись парктроника — нажмите, чтобы остановить" else "Записать парктроник (для настройки)",
+                color = if (pdcOn) c.accent else c.textTertiary,
+                fontFamily = Inter, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+            )
+        }
+        if (pdcOn) {
+            Spacer(Modifier.height(8.dp))
+            androidx.compose.material3.Text(
+                "Медленно сдайте задним ходом к препятствию, затем остановите запись и пришлите логи (Настройки → Отправить логи).",
+                color = c.textDim, fontFamily = Inter, fontSize = 13.sp,
+            )
+        }
     }
 }
 
