@@ -20,4 +20,7 @@ object IBusService {
 
     /** Reset the trip average speed. */
     fun resetTrip(context: Context) = get(context).resetTrip()
+
+    /** Toggle raw PDC frame capture (to decode parking distances from a reversing session). */
+    fun setPdcCapture(context: Context, on: Boolean) = get(context).setPdcCapture(on)
 }

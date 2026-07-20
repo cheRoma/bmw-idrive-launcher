@@ -51,7 +51,21 @@ class IBusReader(private val appContext: Context) {
                 AppLog.d("IBUS", "type ${m.joinToString(" ") { "%02X".format(it) }}")
             }
         },
+        // PDC capture: log every parking-module frame so a reversing session can be decoded offline.
+        onPdcFrame = { m ->
+            AppLog.d("PDCCAP", m.joinToString(" ") { "%02X".format(it) })
+        },
     )
+
+    private val _pdcCapturing = MutableStateFlow(false)
+    val pdcCapturing: StateFlow<Boolean> = _pdcCapturing
+
+    /** Toggle PDC frame capture (for decoding parking distances from a reversing session). */
+    fun setPdcCapture(on: Boolean) {
+        decoder.pdcCapture = on
+        _pdcCapturing.value = on
+        AppLog.d("PDCCAP", if (on) "=== capture ON — drive in reverse, then send logs ===" else "=== capture OFF ===")
+    }
 
     fun start() {
         runCatching { connect() }.onFailure { AppLog.w("IBUS", "start failed: ${it.message}") }
