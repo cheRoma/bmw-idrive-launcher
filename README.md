@@ -256,6 +256,8 @@ The app self-updates so improvements ship without a flash drive:
 
 | Version | Highlights |
 |---|---|
+| **1.6.15–1.6.20** | Denser & bigger iDrive carousel; **reliable Back on every screen** (+ the hardware Back key, the only real panel key); **panel "Music" button → our own player** via an AccessibilityService redirect; **trip average speed** in the on-board computer (with reset); **PDC capture** — polls the parking module on the I-Bus to decode its distances |
+| **1.6.11–1.6.14** | Map rendered as a **TextureView** (fixes the black home screen after an ACC sleep/wake); one-tap **clear of the latched OBC speed limit** (the >6 km/h gong); hardware key-event logging; headless Yandex start (no app flash) |
 | **1.6.10** | On-board computer logs one example of **every distinct I-Bus message type** — groundwork for fuel / consumption / trip averages |
 | **1.6.9** | **Live outside temperature** on the home status bar (replaces the X5 emblem); one shared process-wide I-Bus reader |
 | **1.6.6–1.6.8** | **Own on-board computer** — reads the BMW I-Bus over the CP210x USB adapter (speed · RPM · coolant · outside temp); i-Bus app autostart removed; map tiles proxied through our own host |
@@ -280,7 +282,22 @@ The app self-updates so improvements ship without a flash drive:
 - Reflect the **real "liked" state** from the media session.
 - A distinct, brighter **Day theme** pass.
 
-*(Done since the roadmap was first written: live map background, our own I-Bus on-board computer, outside temperature in the ribbon.)*
+*(Done since the roadmap was first written: live map background, our own I-Bus on-board computer, outside temperature in the ribbon, **trip average speed**.)*
+
+---
+
+## Field notes — problems solved
+
+Developing a launcher for a Chinese Qualcomm head unit, blind, on a real daily-driven car surfaces problems you won't find in the docs. The notable ones:
+
+- **Recovering the unit from a boot-loop brick.** A one-time root experiment flashed a Magisk-patched `boot_b` that kernel-panics on this engineering ROM → an endless *logo → black screen* loop that A/B auto-rollback never escaped. The vendor's recovery steps (a "reset button" menu, a USB stick) are for Rockchip units and do nothing on Qualcomm. The real fix: reach **fastboot over the 4-pin USB‑OTG lead** (see below) and re-flash the unit's own stock boot image (`fastboot flash boot_b …`). Data, apps and settings all survived (userdata is shared across A/B slots).
+- **Which USB port is which.** These units expose three USB channels: a **6-pin lead = USB2 + USB3 (host-only**, for flash drives) and a **4-pin lead = USB_OTG** (the service port). Only the OTG lead enumerates as **fastboot / EDL 9008** on a PC — every recovery attempt on the host ports sees nothing. Reset-power on the OTG lead lands in *fastboot* (`Android Bootloader Interface`, 18D1:D00D), not EDL.
+- **The panel hardware buttons can't be remapped — but can be redirected.** A live `getevent` capture proved only **«Back» sends a real key code** (`KEY_BACK`); every other panel button is hard-wired inside the MCU to `startActivity` a stock Microntek app, emitting no interceptable key event. So we can't hook the key — instead an **AccessibilityService** catches the stock app coming to the foreground and jumps to our matching screen (e.g. the panel "Music" button now opens our player).
+- **Tiny tap targets don't register on this LCD.** Small back chevrons near the very top edge were frequently missed; enlarging them and adding a hardware `BackHandler` on every screen fixed both the touch and the physical Back key.
+- **The grey/black screens.** Yandex Music exposes *several* `MediaSession`s (an idle blank one + the real one) — binding the wrong one drew an empty player; and MapLibre's default GL `SurfaceView` loses its buffer across the ACC sleep/wake cycle → switched to a `TextureView`.
+- **The phantom >6 km/h gong.** The removed OEM app had latched a native OBC speed limit into the instrument cluster; a single I-Bus write (the exact telegram, decompiled from that app) clears it.
+- **YouTube throttling in the region.** Routed only YouTube through an always-on per-app `VpnService` (VLESS/Reality) — no root, everything else stays direct.
+- **The parktronic beeps late by design.** The E53 PDC stays silent until you're close. The distances are on the I-Bus (device `0x60`, answered on request) — capturing them lets us build an earlier, graduated alert.
 
 ---
 
