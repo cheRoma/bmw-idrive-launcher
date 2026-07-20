@@ -59,12 +59,34 @@ class IBusReader(private val appContext: Context) {
 
     private val _pdcCapturing = MutableStateFlow(false)
     val pdcCapturing: StateFlow<Boolean> = _pdcCapturing
+    @Volatile private var pollThread: Thread? = null
 
-    /** Toggle PDC frame capture (for decoding parking distances from a reversing session). */
+    /**
+     * Toggle PDC capture. The E53 PDC (I-Bus node 0x60) answers on REQUEST — nothing broadcasts its
+     * distances, so passive listening sees nothing. While capturing we actively poll it ~4 Hz with the
+     * diagnostic job `3F 03 60 1B 47` (from KLUSEK/BMW-RPi-iBUS) and log every reply (tag PDCCAP), so a
+     * reversing session gives us the raw per-sensor distance sequence to decode + verify on his module.
+     */
     fun setPdcCapture(on: Boolean) {
         decoder.pdcCapture = on
         _pdcCapturing.value = on
-        AppLog.d("PDCCAP", if (on) "=== capture ON — drive in reverse, then send logs ===" else "=== capture OFF ===")
+        AppLog.d("PDCCAP", if (on) "=== capture ON — polling 0x60 @4Hz; reverse, then send logs ===" else "=== capture OFF ===")
+        if (on) startPdcPoll() else pollThread = null // loop below exits when pdcCapture=false
+    }
+
+    private fun startPdcPoll() {
+        if (pollThread != null) return
+        val poll = byteArrayOf(0x3F, 0x03, 0x60, 0x1B, 0x47) // diag 3F → PDC 60, job 1B 47, xor chk 47
+        val t = Thread {
+            while (decoder.pdcCapture) {
+                port?.let { p -> runCatching { p.write(poll, 200) } }
+                runCatching { Thread.sleep(250) }
+            }
+            pollThread = null
+        }
+        pollThread = t
+        t.isDaemon = true
+        t.start()
     }
 
     fun start() {
