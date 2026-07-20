@@ -92,8 +92,14 @@ class HomeActivity : ComponentActivity() {
     // navigate the NavController; cleared after it's consumed.
     private val pendingRoute = androidx.compose.runtime.mutableStateOf<String?>(null)
 
-    private fun navRouteFromIntent(i: Intent?): String? =
-        i?.getStringExtra(EXTRA_NAV_ROUTE)?.takeIf { it in VALID_ROUTES }
+    private fun navRouteFromIntent(i: Intent?): String? {
+        i?.getStringExtra(EXTRA_NAV_ROUTE)?.let { return it.takeIf { r -> r in VALID_ROUTES } }
+        // A plain HOME/launcher press (incl. the panel «Домой» button, which the MCU fires as
+        // ACTION_MAIN + CATEGORY_HOME) → always return to our home carousel. This is the reliable
+        // escape from any sub-screen (e.g. when the Music cold-start left Yandex layered behind us).
+        if (i?.action == Intent.ACTION_MAIN && i.hasCategory(Intent.CATEGORY_HOME)) return "home"
+        return null
+    }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -327,8 +333,13 @@ class HomeActivity : ComponentActivity() {
                 // Open a screen requested from outside (panel-button redirect via ButtonRedirectService).
                 val route by pendingRoute
                 LaunchedEffect(route) {
-                    route?.let {
-                        nav.navigate(it) { launchSingleTop = true }
+                    route?.let { r ->
+                        if (r == "home") {
+                            // Pop everything above the home carousel (no-op if already there).
+                            nav.popBackStack("home", inclusive = false)
+                        } else {
+                            nav.navigate(r) { launchSingleTop = true }
+                        }
                         pendingRoute.value = null
                     }
                 }
