@@ -12,6 +12,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -100,6 +101,8 @@ fun MusicScreen(
 ) {
     val c = LocalLauncherColors.current
     val playing = state as? MusicUiState.Playing
+    // Hardware / gesture back also returns home (safety net beside the on-screen chevron).
+    BackHandler { onBack() }
     Box(Modifier.fillMaxSize()) {
         // ── Background: album cover (Playing) or a dark fallback ──
         MusicBackground(if (playing != null) albumArt else null)
@@ -164,10 +167,11 @@ private fun MusicTopBar(onBack: () -> Unit) {
     var now by remember { mutableStateOf(java.time.LocalDateTime.now()) }
     LaunchedEffect(Unit) { while (true) { now = java.time.LocalDateTime.now(); delay(10_000) } }
     Row(
-        Modifier.fillMaxWidth().height(51.dp).padding(horizontal = 32.dp),
+        Modifier.fillMaxWidth().height(64.dp).padding(start = 18.dp, end = 32.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(width = 64.dp, height = 43.dp).pressScale(onBack), contentAlignment = Alignment.CenterStart) {
+        // Big, comfortable tap target (was 64×43 jammed at the top edge → hard to hit reliably).
+        Box(Modifier.size(width = 80.dp, height = 60.dp).pressScale(onBack), contentAlignment = Alignment.Center) {
             Text("‹", color = Color(0xFFC7CCD2), fontFamily = Inter, fontSize = 40.sp)
         }
         Spacer(Modifier.weight(1f))
