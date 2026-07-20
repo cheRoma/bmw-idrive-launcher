@@ -88,6 +88,19 @@ class HomeActivity : ComponentActivity() {
     // onResume (so it updates after the user returns from the system role/default-apps dialog).
     private val isDefaultLauncherState = androidx.compose.runtime.mutableStateOf(false)
 
+    // Route requested by an external intent (panel-button redirect). Observed in setContent to
+    // navigate the NavController; cleared after it's consumed.
+    private val pendingRoute = androidx.compose.runtime.mutableStateOf<String?>(null)
+
+    private fun navRouteFromIntent(i: Intent?): String? =
+        i?.getStringExtra(EXTRA_NAV_ROUTE)?.takeIf { it in VALID_ROUTES }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        navRouteFromIntent(intent)?.let { pendingRoute.value = it }
+    }
+
     private fun computeIsDefaultLauncher(): Boolean {
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
         val res = packageManager.resolveActivity(intent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)
@@ -121,6 +134,11 @@ class HomeActivity : ComponentActivity() {
 
     companion object {
         const val MANIFEST_URL = "https://k73.online/newBMW/latest.json"
+
+        // Intent extra used by ButtonRedirectService to open a specific launcher screen (panel-button
+        // redirect). Only these routes may be opened this way.
+        const val EXTRA_NAV_ROUTE = "nav_route"
+        val VALID_ROUTES = setOf("music", "apps", "settings", "bordcomputer")
 
         // How long to let i-Bus initialize its I-Bus/USB link before we pull the launcher back to the
         // front. On non-root stock Android an activity launch is necessarily briefly visible; NO_ANIMATION
@@ -279,6 +297,7 @@ class HomeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppLog.d("HOME", "onCreate")
+        navRouteFromIntent(intent)?.let { pendingRoute.value = it }
         enableImmersiveMode()
         requestLocationForMap()
         // Resolve default-launcher status once up front so the first Settings visit is correct.
@@ -305,6 +324,14 @@ class HomeActivity : ComponentActivity() {
             val isNight = ThemeResolver.isNight(settings.themeMode, now, settings.nightStartHour, settings.nightEndHour)
             BmwLauncherTheme(isNight = isNight) {
                 val nav = rememberNavController()
+                // Open a screen requested from outside (panel-button redirect via ButtonRedirectService).
+                val route by pendingRoute
+                LaunchedEffect(route) {
+                    route?.let {
+                        nav.navigate(it) { launchSingleTop = true }
+                        pendingRoute.value = null
+                    }
+                }
                 NavHost(nav, startDestination = "home") {
                     composable("home") {
                         // Live outside temperature from the shared I-Bus reader → status bar.

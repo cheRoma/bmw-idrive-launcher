@@ -66,5 +66,19 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <!-- Redirects panel buttons (which the MCU maps to stock Microntek apps) to our screens. -->
+        <service
+            android:name=".car.ButtonRedirectService"
+            android:exported="false"
+            android:label="BMW: кнопки панели → наши экраны"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/button_redirect_service" />
+        </service>
     </application>
 </manifest>
