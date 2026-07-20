@@ -30,12 +30,12 @@ import java.time.LocalDateTime
 import kotlin.math.absoluteValue
 
 // ── Carousel geometry (Claude Design, screen_2a / screen_1j) ─────────────────
-// The focus tile is a 264dp square (radius 18dp). Neighbours scale down via CarouselGeometry.
-// Page slots are narrower than the card (233dp centre-to-centre), so cards overlap and the side
-// tiles bleed off both edges the way the mockup shows.
-private val FocusCardSize = 264.dp
-private val PageWidth = 233.dp
-private val GlowSize = 416.dp
+// The focus tile is a 300dp square (radius 18dp). Neighbours scale down via CarouselGeometry.
+// Page slots are narrower than the card (195dp centre-to-centre), so cards overlap harder and more
+// side tiles bleed in from both edges — the denser iDrive look Roma asked for.
+private val FocusCardSize = 300.dp
+private val PageWidth = 178.dp
+private val GlowSize = 440.dp
 
 /**
  * Infinitely-looping 3D cylindrical tile carousel (Claude Design home). Tap any tile to open it.
