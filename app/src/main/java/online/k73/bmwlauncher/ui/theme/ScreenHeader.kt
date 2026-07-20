@@ -1,5 +1,6 @@
 package online.k73.bmwlauncher.ui.theme
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +32,8 @@ import androidx.compose.ui.unit.dp
 @Composable
 internal fun ScreenHeader(title: String, onBack: () -> Unit) {
     val c = LocalLauncherColors.current
+    // Hardware/gesture «Назад» also leaves the screen (this unit has a real Back key).
+    BackHandler { onBack() }
     Column(Modifier.fillMaxWidth()) {
         Row(
             Modifier.fillMaxWidth().padding(bottom = 14.dp),
