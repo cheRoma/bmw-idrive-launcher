@@ -1,5 +1,6 @@
 package online.k73.bmwlauncher.ui.bordcomputer
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,6 +33,7 @@ import online.k73.bmwlauncher.car.BordData
 import online.k73.bmwlauncher.car.IBusService
 import online.k73.bmwlauncher.ui.theme.Inter
 import online.k73.bmwlauncher.ui.theme.LocalLauncherColors
+import online.k73.bmwlauncher.ui.theme.pressScale
 
 @Composable
 fun BordComputerScreen(onBack: () -> Unit = {}) {
@@ -42,11 +44,14 @@ fun BordComputerScreen(onBack: () -> Unit = {}) {
     val data by reader.data.collectAsState()
     val scope = rememberCoroutineScope()
     var limitMsg by remember { mutableStateOf<String?>(null) }
+    // Hardware/gesture «Назад» also leaves the screen (this unit has a real Back key).
+    BackHandler { onBack() }
 
     Column(Modifier.fillMaxSize().background(c.background).padding(horizontal = 40.dp, vertical = 24.dp)) {
         // Top bar
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(width = 56.dp, height = 44.dp).clip(RoundedCornerShape(10.dp)).clickable(onClick = onBack), contentAlignment = Alignment.CenterStart) {
+            // Big, comfortable tap target (was 56×44 and rarely registered on this LCD).
+            Box(Modifier.size(width = 76.dp, height = 60.dp).pressScale(onBack), contentAlignment = Alignment.CenterStart) {
                 androidx.compose.material3.Text("‹", color = c.textDim, fontFamily = Inter, fontSize = 40.sp)
             }
             Spacer(Modifier.size(6.dp))
