@@ -17,4 +17,7 @@ object IBusService {
 
     /** Clear the latched OBC "LIMIT 6 KM/H" from the cluster. Call off the main thread. */
     fun clearSpeedLimit(context: Context): Boolean = get(context).clearSpeedLimit()
+
+    /** Reset the trip average speed. */
+    fun resetTrip(context: Context) = get(context).resetTrip()
 }

@@ -14,6 +14,7 @@ import com.hoho.android.usbserial.util.SerialInputOutputManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import online.k73.bmwlauncher.diag.AppLog
+import kotlin.math.roundToInt
 
 /**
  * Reads the car's BMW I-Bus directly over the CP210x USB-serial adapter and exposes the decoded
@@ -33,9 +34,16 @@ class IBusReader(private val appContext: Context) {
     @Volatile private var rxLog = 0
     @Volatile private var typeLog = 0
 
+    // Trip average speed (time-weighted, includes stops). Lives here so it accumulates whenever the
+    // car moves — even with the Борткомпьютер screen closed — since IBusService is process-wide.
+    private val trip = TripStats()
+
     private val decoder = IBusDecoder(
         nowMs = { System.currentTimeMillis() },
-        emit = { _data.value = it },
+        emit = { snap ->
+            snap.speedKmh?.let { trip.onSpeed(it, System.currentTimeMillis()) }
+            _data.value = snap.copy(avgSpeedKmh = trip.averageKmh.roundToInt().takeIf { trip.hasData })
+        },
         // Log one example of each distinct message type so an uploaded log inventories the whole bus
         // (this is how we decode fuel/consumption/etc. from real data).
         onNewType = { m ->
@@ -126,6 +134,12 @@ class IBusReader(private val appContext: Context) {
         }
         if (ok) AppLog.d("IBUS", "sent clear-speed-limit telegram 3B 05 80 41 09 08 FE")
         return ok
+    }
+
+    /** Reset the trip average speed (and its distance). */
+    fun resetTrip() {
+        trip.reset()
+        _data.value = _data.value.copy(avgSpeedKmh = null)
     }
 
     fun stop() {

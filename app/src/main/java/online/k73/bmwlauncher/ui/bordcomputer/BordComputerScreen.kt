@@ -74,7 +74,8 @@ fun BordComputerScreen(onBack: () -> Unit = {}) {
                 androidx.compose.material3.Text("км/ч", color = c.textDim, fontFamily = Inter, fontSize = 26.sp, modifier = Modifier.padding(bottom = 26.dp))
             }
             Spacer(Modifier.height(30.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                StatCell("Средняя", data.avgSpeedKmh?.let { "$it" } ?: "—", "км/ч", Modifier.weight(1f))
                 StatCell("Обороты", data.rpm?.let { "$it" } ?: "—", "об/мин", Modifier.weight(1f))
                 StatCell("Двигатель", data.coolantC?.let { "$it°" } ?: "—", "ОЖ", Modifier.weight(1f))
                 StatCell("За бортом", data.outsideC?.let { "$it°" } ?: "—", "C", Modifier.weight(1f))
@@ -83,27 +84,44 @@ fun BordComputerScreen(onBack: () -> Unit = {}) {
 
         Spacer(Modifier.weight(1f))
 
-        // One-tap fix for the ">6 km/h gong": clears the OBC "LIMIT 6 KM/H" the removed OEM iBus app
-        // latched into the cluster. Sends the exact clear telegram the OEM app used (see IBusReader).
-        Row(
-            Modifier
-                .clip(RoundedCornerShape(999.dp))
-                .background(c.tile)
-                .clickable(enabled = data.connected) {
-                    limitMsg = "Отправляю…"
-                    scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                        val ok = reader.clearSpeedLimit()
-                        limitMsg = if (ok) "Лимит сброшен — проверьте в поездке" else "Нет связи с I-Bus"
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Reset the trip average speed (local state — no I-Bus needed).
+            Box(
+                Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(c.tile)
+                    .clickable {
+                        reader.resetTrip()
+                        limitMsg = "Средняя скорость сброшена"
                     }
-                }
-                .padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            androidx.compose.material3.Text(
-                "Сбросить лимит скорости",
-                color = if (data.connected) c.accent else c.textTertiary,
-                fontFamily = Inter, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
-            )
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+            ) {
+                androidx.compose.material3.Text(
+                    "Сбросить среднюю",
+                    color = c.accent, fontFamily = Inter, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                )
+            }
+            // One-tap fix for the ">6 km/h gong": clears the OBC "LIMIT 6 KM/H" the removed OEM iBus app
+            // latched into the cluster. Sends the exact clear telegram the OEM app used (see IBusReader).
+            Box(
+                Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(c.tile)
+                    .clickable(enabled = data.connected) {
+                        limitMsg = "Отправляю…"
+                        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                            val ok = reader.clearSpeedLimit()
+                            limitMsg = if (ok) "Лимит сброшен — проверьте в поездке" else "Нет связи с I-Bus"
+                        }
+                    }
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+            ) {
+                androidx.compose.material3.Text(
+                    "Сбросить лимит скорости",
+                    color = if (data.connected) c.accent else c.textTertiary,
+                    fontFamily = Inter, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                )
+            }
         }
         limitMsg?.let {
             Spacer(Modifier.height(8.dp))

@@ -4,6 +4,7 @@ package online.k73.bmwlauncher.car
 data class BordData(
     val connected: Boolean = false,
     val speedKmh: Int? = null,
+    val avgSpeedKmh: Int? = null,
     val rpm: Int? = null,
     val coolantC: Int? = null,
     val outsideC: Int? = null,
