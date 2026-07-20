@@ -19,8 +19,8 @@ android {
         applicationId = "online.k73.bmwlauncher"
         minSdk = 26
         targetSdk = 33
-        versionCode = 49
-        versionName = "1.6.21"
+        versionCode = 50
+        versionName = "1.6.22"
 
         // Diagnostic log upload endpoint (token kept out of VCS via keystore.properties).
         buildConfigField("String", "LOG_UPLOAD_URL", "\"https://k73.online/newBMW/logs/upload\"")

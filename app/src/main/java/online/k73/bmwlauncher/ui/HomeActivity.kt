@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -345,6 +346,11 @@ class HomeActivity : ComponentActivity() {
                 }
                 NavHost(nav, startDestination = "home") {
                     composable("home") {
+                        // On the home carousel «Назад» is a no-op — we're already home and a HOME
+                        // launcher has nowhere to go back to. Without this, system BACK finishes the
+                        // Activity and reveals whatever task is behind us (e.g. Yandex, left by the
+                        // Music cold-start) → the user gets bounced out instead of staying home.
+                        BackHandler {}
                         // Live outside temperature from the shared I-Bus reader → status bar.
                         val ibus = remember { IBusService.get(applicationContext) }
                         val bord by ibus.data.collectAsState()
