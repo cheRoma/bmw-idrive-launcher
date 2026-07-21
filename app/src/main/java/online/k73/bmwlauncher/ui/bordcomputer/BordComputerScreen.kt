@@ -31,27 +31,71 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import online.k73.bmwlauncher.car.BordData
 import online.k73.bmwlauncher.car.IBusService
+import online.k73.bmwlauncher.car.PdcStats
 import online.k73.bmwlauncher.ui.theme.Inter
 import online.k73.bmwlauncher.ui.theme.LocalLauncherColors
 import online.k73.bmwlauncher.ui.theme.pressScale
 
 @Composable
 fun BordComputerScreen(onBack: () -> Unit = {}) {
-    val c = LocalLauncherColors.current
     val appCtx = LocalContext.current.applicationContext
     // Shared process-wide reader (also feeds the home status bar) — already connected, no start/stop here.
     val reader = remember { IBusService.get(appCtx) }
     val data by reader.data.collectAsState()
+    val pdcOn by reader.pdcCapturing.collectAsState()
+    val pdcStats by reader.pdcStats.collectAsState()
     val scope = rememberCoroutineScope()
-    var limitMsg by remember { mutableStateOf<String?>(null) }
+    var message by remember { mutableStateOf<String?>(null) }
     // Hardware/gesture «Назад» also leaves the screen (this unit has a real Back key).
     BackHandler { onBack() }
 
-    Column(Modifier.fillMaxSize().background(c.background).padding(horizontal = 40.dp, vertical = 24.dp)) {
+    BordComputerContent(
+        data = data,
+        pdcOn = pdcOn,
+        pdcStats = pdcStats,
+        message = message,
+        onBack = onBack,
+        onResetTrip = {
+            reader.resetTrip()
+            message = "Средняя скорость сброшена"
+        },
+        // One-tap fix for the ">6 km/h gong": clears the OBC "LIMIT 6 KM/H" the removed OEM iBus app
+        // latched into the cluster. Sends the exact clear telegram the OEM app used (see IBusReader).
+        onClearLimit = {
+            message = "Отправляю…"
+            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                val ok = reader.clearSpeedLimit()
+                message = if (ok) "Лимит сброшен — проверьте в поездке" else "Нет связи с I-Bus"
+            }
+        },
+        onTogglePdc = { reader.setPdcCapture(!pdcOn) },
+    )
+}
+
+/**
+ * Stateless layout, so it can be rendered in a screenshot test at the unit's real geometry.
+ *
+ * That geometry is the whole reason this is laid out so tightly: the panel is 1280x720 at 240 dpi,
+ * which leaves **853x432 dp** once the system bars are gone — and the column does not scroll. Every
+ * element here is on a height budget; adding a row pushes the buttons off the bottom edge.
+ */
+@Composable
+fun BordComputerContent(
+    data: BordData,
+    pdcOn: Boolean = false,
+    pdcStats: PdcStats = PdcStats(),
+    message: String? = null,
+    onBack: () -> Unit = {},
+    onResetTrip: () -> Unit = {},
+    onClearLimit: () -> Unit = {},
+    onTogglePdc: () -> Unit = {},
+) {
+    val c = LocalLauncherColors.current
+    Column(Modifier.fillMaxSize().background(c.background).padding(horizontal = 40.dp, vertical = 20.dp)) {
         // Top bar
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             // Big, comfortable tap target (was 56×44 and rarely registered on this LCD).
-            Box(Modifier.size(width = 76.dp, height = 60.dp).pressScale(onBack), contentAlignment = Alignment.CenterStart) {
+            Box(Modifier.size(width = 76.dp, height = 56.dp).pressScale(onBack), contentAlignment = Alignment.CenterStart) {
                 androidx.compose.material3.Text("‹", color = c.textDim, fontFamily = Inter, fontSize = 40.sp)
             }
             Spacer(Modifier.size(6.dp))
@@ -59,7 +103,7 @@ fun BordComputerScreen(onBack: () -> Unit = {}) {
             StatusPill(data)
         }
 
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(12.dp))
 
         if (!data.connected && data.speedKmh == null) {
             WaitState(c.textDim, data.connected)
@@ -68,12 +112,12 @@ fun BordComputerScreen(onBack: () -> Unit = {}) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.Bottom) {
                 androidx.compose.material3.Text(
                     data.speedKmh?.toString() ?: "—",
-                    color = c.text, fontFamily = Inter, fontSize = 120.sp, fontWeight = FontWeight.Bold,
+                    color = c.text, fontFamily = Inter, fontSize = 88.sp, fontWeight = FontWeight.Bold,
                 )
                 Spacer(Modifier.size(10.dp))
-                androidx.compose.material3.Text("км/ч", color = c.textDim, fontFamily = Inter, fontSize = 26.sp, modifier = Modifier.padding(bottom = 26.dp))
+                androidx.compose.material3.Text("км/ч", color = c.textDim, fontFamily = Inter, fontSize = 24.sp, modifier = Modifier.padding(bottom = 18.dp))
             }
-            Spacer(Modifier.height(30.dp))
+            Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 StatCell("Средняя", data.avgSpeedKmh?.let { "$it" } ?: "—", "км/ч", Modifier.weight(1f))
                 StatCell("Обороты", data.rpm?.let { "$it" } ?: "—", "об/мин", Modifier.weight(1f))
@@ -84,81 +128,52 @@ fun BordComputerScreen(onBack: () -> Unit = {}) {
 
         Spacer(Modifier.weight(1f))
 
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            // Reset the trip average speed (local state — no I-Bus needed).
-            Box(
-                Modifier
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(c.tile)
-                    .clickable {
-                        reader.resetTrip()
-                        limitMsg = "Средняя скорость сброшена"
-                    }
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-            ) {
-                androidx.compose.material3.Text(
-                    "Сбросить среднюю",
-                    color = c.accent, fontFamily = Inter, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
-                )
-            }
-            // One-tap fix for the ">6 km/h gong": clears the OBC "LIMIT 6 KM/H" the removed OEM iBus app
-            // latched into the cluster. Sends the exact clear telegram the OEM app used (see IBusReader).
-            Box(
-                Modifier
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(c.tile)
-                    .clickable(enabled = data.connected) {
-                        limitMsg = "Отправляю…"
-                        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                            val ok = reader.clearSpeedLimit()
-                            limitMsg = if (ok) "Лимит сброшен — проверьте в поездке" else "Нет связи с I-Bus"
-                        }
-                    }
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-            ) {
-                androidx.compose.material3.Text(
-                    "Сбросить лимит скорости",
-                    color = if (data.connected) c.accent else c.textTertiary,
-                    fontFamily = Inter, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
-                )
-            }
-        }
-        limitMsg?.let {
-            Spacer(Modifier.height(8.dp))
-            androidx.compose.material3.Text(it, color = c.textDim, fontFamily = Inter, fontSize = 13.sp)
-        }
-
-        // PDC capture (diagnostic): logs every raw parking-module (0x60) frame so a reversing session
-        // can be decoded offline → then we build the early beep. Turn on, reverse toward a wall, turn
-        // off, and send logs from Настройки.
-        val pdcOn by reader.pdcCapturing.collectAsState()
-        val st by reader.pdcStats.collectAsState()
-        Spacer(Modifier.height(10.dp))
-        Box(
-            Modifier
-                .clip(RoundedCornerShape(999.dp))
-                .background(if (pdcOn) c.accent.copy(alpha = 0.16f) else c.tile)
-                .clickable(enabled = data.connected) { reader.setPdcCapture(!pdcOn) }
-                .padding(horizontal = 20.dp, vertical = 12.dp),
-        ) {
-            // The live verdict rides inside the pill: this screen is a fixed 480 dp tall on the unit,
-            // and the layout is already at its limit — extra lines push the buttons off the screen.
-            // replies>0 = module answers; echo>0 with replies=0 = we reach the bus but it stays
-            // silent; all zero = nothing of ours got onto the wire (adapter with no TX line).
-            androidx.compose.material3.Text(
-                when {
-                    !pdcOn -> "Записать парктроник (для настройки)"
-                    st.error != null -> "● Запись — ошибка шины: ${st.error}"
-                    else -> "● Запись — запросов ${st.sent} · эхо ${st.echo} · ответов ${st.replies}"
-                },
-                color = when {
-                    !pdcOn -> c.textTertiary
-                    st.replies > 0 -> c.callGreen
-                    else -> c.accent
-                },
-                fontFamily = Inter, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+        // All three actions on ONE row: two rows of pills did not fit the 432 dp and the last one
+        // was clipped by the bottom edge.
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            ActionPill("Сбросить среднюю", enabled = true, onClick = onResetTrip)
+            ActionPill("Сбросить лимит", enabled = data.connected, onClick = onClearLimit)
+            ActionPill(
+                if (pdcOn) "● Идёт запись — стоп" else "Записать парктроник",
+                enabled = data.connected,
+                onClick = onTogglePdc,
+                active = pdcOn,
             )
         }
+
+        // One reserved line: either a result message, or the live capture verdict. Keeping the
+        // counters here instead of in the pill keeps the row from outgrowing the screen width.
+        val line = when {
+            pdcOn && pdcStats.error != null -> "ошибка записи в шину: ${pdcStats.error}"
+            pdcOn -> "запросов ${pdcStats.sent} · эхо ${pdcStats.echo} · ответов ${pdcStats.replies}"
+            else -> message
+        }
+        Spacer(Modifier.height(6.dp))
+        androidx.compose.material3.Text(
+            line ?: "",
+            color = if (pdcOn && pdcStats.replies > 0) c.callGreen else c.textDim,
+            fontFamily = Inter, fontSize = 13.sp,
+        )
+    }
+}
+
+/** Pill-shaped action button; [active] tints it while a capture is running. */
+@Composable
+private fun ActionPill(label: String, enabled: Boolean, onClick: () -> Unit, active: Boolean = false) {
+    val c = LocalLauncherColors.current
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(if (active) c.accent.copy(alpha = 0.16f) else c.tile)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 12.dp),
+    ) {
+        androidx.compose.material3.Text(
+            label,
+            color = if (enabled) c.accent else c.textTertiary,
+            fontFamily = Inter, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+        )
     }
 }
 
@@ -180,14 +195,21 @@ private fun StatusPill(data: BordData) {
 private fun StatCell(label: String, value: String, unit: String, modifier: Modifier = Modifier) {
     val c = LocalLauncherColors.current
     Column(
-        modifier.clip(RoundedCornerShape(18.dp)).background(c.tile).padding(20.dp),
+        modifier.clip(RoundedCornerShape(18.dp)).background(c.tile).padding(horizontal = 16.dp, vertical = 18.dp),
     ) {
         androidx.compose.material3.Text(label.uppercase(), color = c.textTertiary, fontFamily = Inter, fontSize = 12.sp, letterSpacing = 1.5.sp)
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.Bottom) {
-            androidx.compose.material3.Text(value, color = c.accent, fontFamily = Inter, fontSize = 42.sp, fontWeight = FontWeight.Bold)
+            // 36sp, not 42: a four-digit rpm squeezed the unit label into three wrapped lines.
+            androidx.compose.material3.Text(
+                value, color = c.accent, fontFamily = Inter, fontSize = 36.sp,
+                fontWeight = FontWeight.Bold, maxLines = 1,
+            )
             Spacer(Modifier.size(6.dp))
-            androidx.compose.material3.Text(unit, color = c.textDim, fontFamily = Inter, fontSize = 15.sp, modifier = Modifier.padding(bottom = 8.dp))
+            androidx.compose.material3.Text(
+                unit, color = c.textDim, fontFamily = Inter, fontSize = 13.sp,
+                maxLines = 1, softWrap = false, modifier = Modifier.padding(bottom = 6.dp),
+            )
         }
     }
 }
