@@ -12,7 +12,7 @@ package online.k73.bmwlauncher.car
  * Decoded (all from src 0x80 = IKE instrument cluster, dst 0xBF = global broadcast):
  *  - `0x18` speed/rpm:  speed_km/h = data[0] * 2,  rpm = data[1] * 100   (confirmed vs the OEM app)
  *  - `0x19` temps:      outside_°C = signed data[0],  coolant_°C = signed data[1]
- *  - `0x11` ignition:   bit0 = ignition on
+ *  - `0x11` key state:  bit0 = KL_R (ACC), bit1 = KL_15 (ignition), bit2 = KL_50 (starter)
  */
 class IBusDecoder(
     private val nowMs: () -> Long,
@@ -77,7 +77,10 @@ class IBusDecoder(
             when (cmd) {
                 0x18 -> if (m.size >= 6) next = next.copy(speedKmh = m[4] * 2, rpm = m[5] * 100)
                 0x19 -> if (m.size >= 6) next = next.copy(outsideC = signed(m[4]), coolantC = signed(m[5]))
-                0x11 -> if (m.size >= 5) next = next.copy(ignition = (m[4] and 0x01) != 0)
+                0x11 -> if (m.size >= 5) {
+                    val key = keyPosition(m[4])
+                    next = next.copy(ignition = key != KeyPosition.OFF, keyPosition = key)
+                }
             }
         }
         if (next != cur) {
@@ -87,4 +90,17 @@ class IBusDecoder(
     }
 
     private fun signed(b: Int): Int = b.toByte().toInt()
+
+    companion object {
+        /**
+         * Highest live terminal wins: cranking asserts KL_50 while KL_15 and KL_R are still set,
+         * so testing the bits in this order is what separates START from IGNITION.
+         */
+        fun keyPosition(b: Int): KeyPosition = when {
+            b and 0x04 != 0 -> KeyPosition.START
+            b and 0x02 != 0 -> KeyPosition.IGNITION
+            b and 0x01 != 0 -> KeyPosition.ACC
+            else -> KeyPosition.OFF
+        }
+    }
 }

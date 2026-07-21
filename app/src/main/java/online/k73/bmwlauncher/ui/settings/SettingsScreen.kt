@@ -56,6 +56,11 @@ fun SettingsScreen(
     onSetDefault: () -> Unit,
     logState: LogSendState,
     onSendLogs: () -> Unit,
+    /** False when the I-Bus adapter isn't connected — nothing mirror-related can work then. */
+    mirrorsAvailable: Boolean = false,
+    onMirrorAutoFold: (Boolean) -> Unit = {},
+    onFoldMirrors: () -> Unit = {},
+    onUnfoldMirrors: () -> Unit = {},
     onBack: () -> Unit,
 ) {
     val c = LocalLauncherColors.current
@@ -96,6 +101,26 @@ fun SettingsScreen(
                 Text("✓", color = c.accent, fontSize = TypeTokens.title, fontFamily = Inter)
             } else {
                 AmberPill("Сделать основным", onSetDefault)
+            }
+        }
+        RowDivider()
+        SettingRow(
+            title = "Складывать зеркала",
+            subtitle = if (mirrorsAvailable) {
+                "При выключении зажигания · раскладывать при пуске"
+            } else {
+                "Нет связи с I-Bus — проверьте адаптер"
+            },
+        ) {
+            AmberSwitch(settings.mirrorAutoFold && mirrorsAvailable, onMirrorAutoFold, enabled = mirrorsAvailable)
+        }
+        RowDivider()
+        // Manual control: the automation is only trustworthy once these two have visibly moved the
+        // mirrors in the car, since the alternative way to test it is switching off a real engine.
+        SettingRow(title = "Проверить зеркала", subtitle = "Отправить команду вручную") {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                AmberPill("Сложить", onFoldMirrors, enabled = mirrorsAvailable)
+                AmberPill("Разложить", onUnfoldMirrors, enabled = mirrorsAvailable)
             }
         }
         RowDivider()
@@ -144,11 +169,12 @@ private fun RowDivider() {
 }
 
 @Composable
-private fun AmberSwitch(checked: Boolean, onChange: (Boolean) -> Unit) {
+private fun AmberSwitch(checked: Boolean, onChange: (Boolean) -> Unit, enabled: Boolean = true) {
     val c = LocalLauncherColors.current
     Switch(
         checked = checked,
         onCheckedChange = onChange,
+        enabled = enabled,
         colors = SwitchDefaults.colors(
             checkedTrackColor = c.accent,
             checkedThumbColor = Color.White,
@@ -192,17 +218,21 @@ private fun ThemeSegments(selected: ThemeMode, onThemeMode: (ThemeMode) -> Unit)
 }
 
 @Composable
-private fun AmberPill(label: String, onClick: () -> Unit) {
+private fun AmberPill(label: String, onClick: () -> Unit, enabled: Boolean = true) {
     val c = LocalLauncherColors.current
     Box(
         Modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(c.accent)
-            .pressScale(onClick)
+            .background(if (enabled) c.accent else c.surfaceHi)
+            .then(if (enabled) Modifier.pressScale(onClick) else Modifier)
             .padding(horizontal = 20.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = c.background, fontSize = TypeTokens.label, fontWeight = FontWeight.SemiBold, fontFamily = Inter)
+        Text(
+            label,
+            color = if (enabled) c.background else c.textTertiary,
+            fontSize = TypeTokens.label, fontWeight = FontWeight.SemiBold, fontFamily = Inter,
+        )
     }
 }
 
@@ -216,7 +246,7 @@ private fun DiagnosticsRow(logState: LogSendState, onSendLogs: () -> Unit) {
     }
     SettingRow(title = "Диагностика", subtitle = "Отправить логи разработчику") {
         // Ignore taps while a send is in flight.
-        AmberPill(label) { if (logState != LogSendState.Sending) onSendLogs() }
+        AmberPill(label, onClick = { if (logState != LogSendState.Sending) onSendLogs() })
     }
 }
 
@@ -259,8 +289,9 @@ private fun UpdateRow(
                 )
             }
         }
-        AmberPill(if (available) "Обновить" else "Проверить") {
-            if (available) onInstallUpdate() else onCheckUpdate()
-        }
+        AmberPill(
+            if (available) "Обновить" else "Проверить",
+            onClick = { if (available) onInstallUpdate() else onCheckUpdate() },
+        )
     }
 }

@@ -12,6 +12,9 @@ data class LauncherSettings(
     val iBusPackage: String = "com.e39.ak.e39ibus.app",
     // Z-Link (ZLINK5) is the working CarPlay app on this unit; CarbitLink/net.easyconn does not work.
     val carplayPackage: String = "com.zjinnova.zlink",
+    // Mirrors fold when the key goes off, unfold on ignition. Off by default: it must not start
+    // driving motors before the manual buttons have been tried in the car.
+    val mirrorAutoFold: Boolean = false,
     val nightStartHour: Int = 20,
     val nightEndHour: Int = 7,
 )
