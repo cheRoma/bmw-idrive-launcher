@@ -13,9 +13,17 @@ import java.util.Locale
 object AppLog {
     const val CAP = 600
 
+    /**
+     * PDC capture gets its own, far deeper ring: while capturing we poll the parking module at 4 Hz
+     * and log both our request and its reply, so ~8 lines/s would blow through [CAP] in about a
+     * minute — losing the approach to the obstacle, which is the only part worth decoding.
+     */
+    const val PDC_CAP = 6000
+
     // Fixed formatter; guarded by the buffer lock so a single SimpleDateFormat is safe.
     private val timeFmt = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
     private val buffer = ArrayDeque<String>(CAP)
+    private val pdcBuffer = ArrayDeque<String>(64)
 
     /** Pure line formatter — testable without Android. */
     fun format(timeMillis: Long, level: Char, tag: String, msg: String): String {
@@ -44,13 +52,32 @@ object AppLog {
         log('E', tag, full)
     }
 
+    /**
+     * Add a raw parking-module frame line. Separate buffer from [add] so a capture session neither
+     * evicts the event log nor gets evicted by it — both survive into the uploaded report.
+     */
+    fun pdc(line: String) {
+        synchronized(pdcBuffer) {
+            pdcBuffer.addLast(line)
+            while (pdcBuffer.size > PDC_CAP) pdcBuffer.removeFirst()
+        }
+    }
+
     /** The buffer joined by newlines, oldest first. */
     fun snapshot(): String = synchronized(buffer) { buffer.joinToString("\n") }
 
-    /** Test hook: clear the buffer. */
-    fun clear() = synchronized(buffer) { buffer.clear() }
+    /** The PDC capture buffer joined by newlines, oldest first. */
+    fun pdcSnapshot(): String = synchronized(pdcBuffer) { pdcBuffer.joinToString("\n") }
+
+    /** Test hook: clear both buffers. */
+    fun clear() {
+        synchronized(buffer) { buffer.clear() }
+        synchronized(pdcBuffer) { pdcBuffer.clear() }
+    }
 
     fun size(): Int = synchronized(buffer) { buffer.size }
+
+    fun pdcSize(): Int = synchronized(pdcBuffer) { pdcBuffer.size }
 
     private fun stackToString(t: Throwable): String {
         val sw = java.io.StringWriter()
