@@ -15,13 +15,13 @@ class LogUploaderTest {
 
     @Test fun report_includes_pdc_section_before_logcat_when_captured() {
         val r = LogUploader.buildReport("DEV", "events", "60 0E 3F A0", "logcat", null)
-        assertTrue("has PDC section", r.contains("=== PDC CAPTURE ===\n60 0E 3F A0"))
-        assertTrue("PDC comes before logcat", r.indexOf("=== PDC CAPTURE ===") < r.indexOf("=== LOGCAT ==="))
+        assertTrue("has capture section", r.contains("=== CAPTURE ===\n60 0E 3F A0"))
+        assertTrue("capture comes before logcat", r.indexOf("=== CAPTURE ===") < r.indexOf("=== LOGCAT ==="))
     }
 
     @Test fun report_omits_pdc_section_when_no_capture_ran() {
         val r = LogUploader.buildReport("DEV", "events", "", "logcat", null)
-        assertTrue("no empty PDC header", !r.contains("PDC CAPTURE"))
+        assertTrue("no empty capture header", !r.contains("=== CAPTURE ==="))
     }
 
     @Test fun report_appends_crash_only_when_present() {

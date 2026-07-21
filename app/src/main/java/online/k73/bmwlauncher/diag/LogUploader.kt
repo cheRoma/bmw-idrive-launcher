@@ -33,7 +33,7 @@ object LogUploader {
             append("\n=== EVENT LOG ===\n")
             append(eventLog)
             if (pdc.isNotBlank()) {
-                append("\n=== PDC CAPTURE ===\n")
+                append("\n=== CAPTURE ===\n")
                 append(pdc)
             }
             append("\n=== LOGCAT ===\n")
