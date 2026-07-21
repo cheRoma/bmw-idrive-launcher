@@ -39,13 +39,15 @@ class AppLogTest {
         AppLog.add("event")
         AppLog.pdc("60 0E 3F A0")
         assertEquals("event", AppLog.snapshot())
-        assertEquals("60 0E 3F A0", AppLog.pdcSnapshot())
+        // Capture lines carry an "HH:mm:ss.SSS  " prefix so a press can be located in time.
+        assertTrue("timestamped frame: ${AppLog.pdcSnapshot()}", AppLog.pdcSnapshot().endsWith("  60 0E 3F A0"))
+        assertEquals("HH:mm:ss.SSS is 12 chars", 12, AppLog.pdcSnapshot().indexOf(" "))
     }
 
     @Test fun event_log_flood_does_not_evict_pdc_frames() {
         AppLog.pdc("frame-1")
         for (i in 0 until AppLog.CAP * 2) AppLog.add("noise-$i")
-        assertEquals("frame-1", AppLog.pdcSnapshot())
+        assertTrue(AppLog.pdcSnapshot().endsWith("  frame-1"))
     }
 
     @Test fun pdc_buffer_holds_a_full_reversing_session() {
@@ -59,8 +61,8 @@ class AppLogTest {
         for (i in 0 until total) AppLog.pdc("f-$i")
         val snap = AppLog.pdcSnapshot().lines()
         assertEquals(AppLog.PDC_CAP, snap.size)
-        assertEquals("f-10", snap.first())
-        assertEquals("f-${total - 1}", snap.last())
+        assertTrue(snap.first().endsWith("  f-10"))
+        assertTrue(snap.last().endsWith("  f-${total - 1}"))
     }
 
     @Test fun clear_empties_both_buffers() {
