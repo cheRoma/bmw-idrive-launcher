@@ -23,6 +23,27 @@ object LogUploader {
     fun sanitizedName(reason: String): String =
         sanitize("${Build.MODEL}-v${BuildConfig.VERSION_NAME}-$reason-${System.currentTimeMillis()}")
 
+    /**
+     * Assemble the report body. Pure/testable — no Android, no I/O. The PDC section is omitted
+     * unless a capture actually ran, and sits before the (huge) logcat so it stays easy to find.
+     */
+    fun buildReport(device: String, eventLog: String, pdc: String, logcat: String, crash: String?): String =
+        buildString {
+            append(device)
+            append("\n=== EVENT LOG ===\n")
+            append(eventLog)
+            if (pdc.isNotBlank()) {
+                append("\n=== PDC CAPTURE ===\n")
+                append(pdc)
+            }
+            append("\n=== LOGCAT ===\n")
+            append(logcat)
+            if (!crash.isNullOrBlank()) {
+                append("\n=== LAST CRASH ===\n")
+                append(crash)
+            }
+        }
+
     /** Replace every char not in [A-Za-z0-9._-] with '_'. Pure/testable. */
     fun sanitize(raw: String): String =
         raw.map { if (it in ALLOWED) it else '_' }.joinToString("")
@@ -36,17 +57,13 @@ object LogUploader {
             return@withContext Result.failure(IllegalStateException("Загрузка логов не настроена (нет токена)"))
         }
         val crashFile = File(app.filesDir, CrashHandler.PENDING_CRASH)
-        val report = buildString {
-            append(DeviceInfo.collect(app))
-            append("\n=== EVENT LOG ===\n")
-            append(AppLog.snapshot())
-            append("\n=== LOGCAT ===\n")
-            append(captureLogcat())
-            if (crashFile.exists()) {
-                append("\n=== LAST CRASH ===\n")
-                append(runCatching { crashFile.readText() }.getOrDefault(""))
-            }
-        }
+        val report = buildReport(
+            device = DeviceInfo.collect(app),
+            eventLog = AppLog.snapshot(),
+            pdc = AppLog.pdcSnapshot(),
+            logcat = captureLogcat(),
+            crash = if (crashFile.exists()) runCatching { crashFile.readText() }.getOrDefault("") else null,
+        )
         val name = sanitizedName(reason)
         val result = runCatching { post(report, name) }
         result.onSuccess {

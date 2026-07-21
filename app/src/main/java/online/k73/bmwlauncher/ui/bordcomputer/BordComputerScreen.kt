@@ -147,11 +147,27 @@ fun BordComputerScreen(onBack: () -> Unit = {}) {
             )
         }
         if (pdcOn) {
+            val st by reader.pdcStats.collectAsState()
             Spacer(Modifier.height(8.dp))
             androidx.compose.material3.Text(
                 "Медленно сдайте задним ходом к препятствию, затем остановите запись и пришлите логи (Настройки → Отправить логи).",
                 color = c.textDim, fontFamily = Inter, fontSize = 13.sp,
             )
+            Spacer(Modifier.height(6.dp))
+            // Live verdict, so a wasted run is obvious before driving off: replies>0 means the module
+            // answers us; echo>0 with replies=0 means we reach the bus but it stays silent; both at 0
+            // means nothing of ours got onto the wire at all.
+            androidx.compose.material3.Text(
+                "запросов ${st.sent} · эхо ${st.echo} · ответов ${st.replies}",
+                color = if (st.replies > 0) c.callGreen else c.textDim,
+                fontFamily = Inter, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+            )
+            st.error?.let {
+                androidx.compose.material3.Text(
+                    "ошибка записи в шину: $it",
+                    color = c.textTertiary, fontFamily = Inter, fontSize = 12.sp,
+                )
+            }
         }
     }
 }

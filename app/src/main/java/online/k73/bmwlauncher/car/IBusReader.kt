@@ -52,14 +52,31 @@ class IBusReader(private val appContext: Context) {
             }
         },
         // PDC capture: log every parking-module frame so a reversing session can be decoded offline.
+        // Own buffer (not the 600-line event ring) — at ~8 lines/s a session would evict itself.
         onPdcFrame = { m ->
-            AppLog.d("PDCCAP", m.joinToString(" ") { "%02X".format(it) })
+            AppLog.pdc(m.joinToString(" ") { "%02X".format(it) })
+            bumpPdc(isReply = m[0] == 0x60)
         },
     )
 
     private val _pdcCapturing = MutableStateFlow(false)
     val pdcCapturing: StateFlow<Boolean> = _pdcCapturing
+    private val _pdcStats = MutableStateFlow(PdcStats())
+    val pdcStats: StateFlow<PdcStats> = _pdcStats
+    private val pdcLock = Any()
     @Volatile private var pollThread: Thread? = null
+
+    /** Frames arrive on the serial IO thread, `sent` increments on the poll thread — hence the lock. */
+    private fun bumpPdc(isReply: Boolean) = synchronized(pdcLock) {
+        val s = _pdcStats.value
+        _pdcStats.value = if (isReply) s.copy(replies = s.replies + 1) else s.copy(echo = s.echo + 1)
+    }
+
+    /** First write failure earns a log line; after that it only lives in the on-screen stats. */
+    private fun notePdcError(msg: String) = synchronized(pdcLock) {
+        if (_pdcStats.value.error == null) AppLog.pdc("!! запись в шину не удалась: $msg")
+        _pdcStats.value = _pdcStats.value.copy(error = msg)
+    }
 
     /**
      * Toggle PDC capture. The E53 PDC (I-Bus node 0x60) answers on REQUEST — nothing broadcasts its
@@ -70,16 +87,35 @@ class IBusReader(private val appContext: Context) {
     fun setPdcCapture(on: Boolean) {
         decoder.pdcCapture = on
         _pdcCapturing.value = on
-        AppLog.d("PDCCAP", if (on) "=== capture ON — polling 0x60 @4Hz; reverse, then send logs ===" else "=== capture OFF ===")
-        if (on) startPdcPoll() else pollThread = null // loop below exits when pdcCapture=false
+        if (on) {
+            _pdcStats.value = PdcStats()
+            AppLog.pdc("=== capture ON — polling 3F 03 60 1B 47 @4Hz ===")
+            AppLog.d("PDCCAP", "capture on")
+            startPdcPoll()
+        } else {
+            val s = _pdcStats.value
+            val summary = "sent=${s.sent} echo=${s.echo} replies=${s.replies}" + (s.error?.let { " error=$it" } ?: "")
+            AppLog.pdc("=== capture OFF — $summary ===")
+            AppLog.d("PDCCAP", "capture off: $summary")
+            pollThread = null // loop below exits when pdcCapture=false
+        }
     }
 
     private fun startPdcPoll() {
         if (pollThread != null) return
-        val poll = byteArrayOf(0x3F, 0x03, 0x60, 0x1B, 0x47) // diag 3F → PDC 60, job 1B 47, xor chk 47
+        val poll = byteArrayOf(0x3F, 0x03, 0x60, 0x1B, 0x47) // diag 3F → PDC 60, job 1B, xor chk 47
         val t = Thread {
             while (decoder.pdcCapture) {
-                port?.let { p -> runCatching { p.write(poll, 200) } }
+                // A silent failure here is the worst outcome: an empty capture can't tell "module
+                // stayed quiet" from "we never got a byte onto the bus" (adapters with no TX line).
+                val p = port
+                if (p == null) {
+                    notePdcError("порт закрыт — адаптер не подключён")
+                } else {
+                    runCatching { p.write(poll, 200) }
+                        .onSuccess { synchronized(pdcLock) { _pdcStats.value = _pdcStats.value.let { it.copy(sent = it.sent + 1) } } }
+                        .onFailure { notePdcError(it.message ?: it.javaClass.simpleName) }
+                }
                 runCatching { Thread.sleep(250) }
             }
             pollThread = null

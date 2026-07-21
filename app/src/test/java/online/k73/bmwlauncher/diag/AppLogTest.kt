@@ -30,4 +30,43 @@ class AppLogTest {
         AppLog.add("a"); AppLog.add("b"); AppLog.add("c")
         assertEquals("a\nb\nc", AppLog.snapshot())
     }
+
+    // --- PDC capture buffer -------------------------------------------------
+    // Parking frames arrive ~8/s while capturing, which would evict the whole event log (and then
+    // itself) from the 600-line ring. They get their own, much deeper buffer instead.
+
+    @Test fun pdc_lines_do_not_touch_the_event_log() {
+        AppLog.add("event")
+        AppLog.pdc("60 0E 3F A0")
+        assertEquals("event", AppLog.snapshot())
+        assertEquals("60 0E 3F A0", AppLog.pdcSnapshot())
+    }
+
+    @Test fun event_log_flood_does_not_evict_pdc_frames() {
+        AppLog.pdc("frame-1")
+        for (i in 0 until AppLog.CAP * 2) AppLog.add("noise-$i")
+        assertEquals("frame-1", AppLog.pdcSnapshot())
+    }
+
+    @Test fun pdc_buffer_holds_a_full_reversing_session() {
+        // ~8 lines/s (our request echo + the module's reply at 4 Hz) → the cap must cover minutes,
+        // not the ~75 s the 600-line event ring would give.
+        assertTrue("pdc cap covers >5 min of capture", AppLog.PDC_CAP >= 8 * 300)
+    }
+
+    @Test fun pdc_buffer_evicts_oldest_past_cap() {
+        val total = AppLog.PDC_CAP + 10
+        for (i in 0 until total) AppLog.pdc("f-$i")
+        val snap = AppLog.pdcSnapshot().lines()
+        assertEquals(AppLog.PDC_CAP, snap.size)
+        assertEquals("f-10", snap.first())
+        assertEquals("f-${total - 1}", snap.last())
+    }
+
+    @Test fun clear_empties_both_buffers() {
+        AppLog.add("a"); AppLog.pdc("b")
+        AppLog.clear()
+        assertEquals("", AppLog.snapshot())
+        assertEquals("", AppLog.pdcSnapshot())
+    }
 }

@@ -11,3 +11,17 @@ data class BordData(
     val ignition: Boolean? = null,
     val updatedAtMs: Long = 0L,
 )
+
+/**
+ * Live counters for a PDC capture session, shown on screen so a reversing run can be judged in the
+ * car instead of after decoding logs.
+ *
+ * [echo] counts our own requests seen coming back off the bus: without it an empty capture is
+ * ambiguous — a silent module and an adapter that can't transmit look identical.
+ */
+data class PdcStats(
+    val sent: Int = 0,
+    val echo: Int = 0,
+    val replies: Int = 0,
+    val error: String? = null,
+)
