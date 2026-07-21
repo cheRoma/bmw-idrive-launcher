@@ -132,6 +132,7 @@ fun BordComputerScreen(onBack: () -> Unit = {}) {
         // can be decoded offline → then we build the early beep. Turn on, reverse toward a wall, turn
         // off, and send logs from Настройки.
         val pdcOn by reader.pdcCapturing.collectAsState()
+        val st by reader.pdcStats.collectAsState()
         Spacer(Modifier.height(10.dp))
         Box(
             Modifier
@@ -140,34 +141,23 @@ fun BordComputerScreen(onBack: () -> Unit = {}) {
                 .clickable(enabled = data.connected) { reader.setPdcCapture(!pdcOn) }
                 .padding(horizontal = 20.dp, vertical = 12.dp),
         ) {
+            // The live verdict rides inside the pill: this screen is a fixed 480 dp tall on the unit,
+            // and the layout is already at its limit — extra lines push the buttons off the screen.
+            // replies>0 = module answers; echo>0 with replies=0 = we reach the bus but it stays
+            // silent; all zero = nothing of ours got onto the wire (adapter with no TX line).
             androidx.compose.material3.Text(
-                if (pdcOn) "● Идёт запись парктроника — нажмите, чтобы остановить" else "Записать парктроник (для настройки)",
-                color = if (pdcOn) c.accent else c.textTertiary,
+                when {
+                    !pdcOn -> "Записать парктроник (для настройки)"
+                    st.error != null -> "● Запись — ошибка шины: ${st.error}"
+                    else -> "● Запись — запросов ${st.sent} · эхо ${st.echo} · ответов ${st.replies}"
+                },
+                color = when {
+                    !pdcOn -> c.textTertiary
+                    st.replies > 0 -> c.callGreen
+                    else -> c.accent
+                },
                 fontFamily = Inter, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
             )
-        }
-        if (pdcOn) {
-            val st by reader.pdcStats.collectAsState()
-            Spacer(Modifier.height(8.dp))
-            androidx.compose.material3.Text(
-                "Медленно сдайте задним ходом к препятствию, затем остановите запись и пришлите логи (Настройки → Отправить логи).",
-                color = c.textDim, fontFamily = Inter, fontSize = 13.sp,
-            )
-            Spacer(Modifier.height(6.dp))
-            // Live verdict, so a wasted run is obvious before driving off: replies>0 means the module
-            // answers us; echo>0 with replies=0 means we reach the bus but it stays silent; both at 0
-            // means nothing of ours got onto the wire at all.
-            androidx.compose.material3.Text(
-                "запросов ${st.sent} · эхо ${st.echo} · ответов ${st.replies}",
-                color = if (st.replies > 0) c.callGreen else c.textDim,
-                fontFamily = Inter, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-            )
-            st.error?.let {
-                androidx.compose.material3.Text(
-                    "ошибка записи в шину: $it",
-                    color = c.textTertiary, fontFamily = Inter, fontSize = 12.sp,
-                )
-            }
         }
     }
 }
