@@ -58,6 +58,12 @@ class IBusReader(private val appContext: Context) {
             AppLog.pdc(m.joinToString(" ") { "%02X".format(it) })
             bumpPdc(isReply = m[0] == 0x60)
         },
+        // Whole-bus capture: what does the car itself put on the wire when a physical button is
+        // pressed? That is the only trustworthy source for a telegram we intend to replay.
+        onBusFrame = { m ->
+            AppLog.pdc(m.joinToString(" ") { "%02X".format(it) })
+            _busFrames.value = _busFrames.value + 1
+        },
     )
 
     private val _pdcCapturing = MutableStateFlow(false)
@@ -66,6 +72,29 @@ class IBusReader(private val appContext: Context) {
     val pdcStats: StateFlow<PdcStats> = _pdcStats
     private val pdcLock = Any()
     @Volatile private var pollThread: Thread? = null
+
+    private val _busCapturing = MutableStateFlow(false)
+    val busCapturing: StateFlow<Boolean> = _busCapturing
+    private val _busFrames = MutableStateFlow(0)
+    val busFrames: StateFlow<Int> = _busFrames
+
+    /**
+     * Record every frame on the bus. Pure listening — nothing is written, so this cannot actuate
+     * anything in the car. Turn on, press the car's own button, turn off, send logs: the frame the
+     * car emits is the one worth replaying.
+     */
+    fun setBusCapture(on: Boolean) {
+        decoder.busCapture = on
+        _busCapturing.value = on
+        if (on) {
+            _busFrames.value = 0
+            AppLog.pdc("=== ЗАПИСЬ ШИНЫ ВКЛЮЧЕНА — нажмите нужную кнопку в машине ===")
+            AppLog.d("BUSCAP", "bus capture on")
+        } else {
+            AppLog.pdc("=== ЗАПИСЬ ШИНЫ ВЫКЛЮЧЕНА — кадров: ${_busFrames.value} ===")
+            AppLog.d("BUSCAP", "bus capture off: ${_busFrames.value} frames")
+        }
+    }
 
     /** Mirror automation: off until the user turns it on (and only after the manual buttons work). */
     @Volatile var mirrorAutoEnabled = false

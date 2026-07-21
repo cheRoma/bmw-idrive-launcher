@@ -391,6 +391,8 @@ class HomeActivity : ComponentActivity() {
                         // Same process-wide reader the home screen uses; mirror commands need its port.
                         val ibus = remember { IBusService.get(applicationContext) }
                         val ibusData by ibus.data.collectAsState()
+                        val busCapturing by ibus.busCapturing.collectAsState()
+                        val busFrames by ibus.busFrames.collectAsState()
                         SettingsScreen(
                             settings = settings,
                             onAutostart = { lifecycleScope.launch { store.setAutostartIBus(it) } },
@@ -405,10 +407,10 @@ class HomeActivity : ComponentActivity() {
                             onSetDefault = { requestDefaultLauncher() },
                             logState = logSend,
                             onSendLogs = { onSendLogs() },
-                            mirrorsAvailable = ibusData.connected,
-                            onMirrorAutoFold = { lifecycleScope.launch { store.setMirrorAutoFold(it) } },
-                            onFoldMirrors = { lifecycleScope.launch(Dispatchers.IO) { ibus.foldMirrors() } },
-                            onUnfoldMirrors = { lifecycleScope.launch(Dispatchers.IO) { ibus.unfoldMirrors() } },
+                            ibusConnected = ibusData.connected,
+                            busCapturing = busCapturing,
+                            busFrames = busFrames,
+                            onToggleBusCapture = { ibus.setBusCapture(!busCapturing) },
                             onBack = { nav.popBackStack() },
                         )
                     }

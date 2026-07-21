@@ -24,6 +24,10 @@ class IBusDecoder(
      *  sequence (unlike onNewType's one-per-type) needed to decode the parking distances, which BMW
      *  doesn't publish. Toggled on for a reversing session, then off. */
     private val onPdcFrame: (IntArray) -> Unit = {},
+    /** When [busCapture] is on, EVERY valid frame on the wire is delivered here. Used to find out
+     *  what the car itself says when a physical button is pressed, instead of guessing telegrams
+     *  from documentation — which is how the "mirror" job turned out to drive the windows. */
+    private val onBusFrame: (IntArray) -> Unit = {},
 ) {
     private val buf = ArrayDeque<Int>()
     private var cur = BordData(connected = true)
@@ -31,6 +35,9 @@ class IBusDecoder(
 
     /** PDC capture toggle — see [onPdcFrame]. */
     var pdcCapture = false
+
+    /** Whole-bus capture toggle — see [onBusFrame]. Read-only: nothing is ever written to the bus. */
+    var busCapture = false
 
     /** Raw messages, most-recent last — a small ring for on-car diagnostics (hex dump). */
     val recentFrames = ArrayDeque<IntArray>()
@@ -57,6 +64,7 @@ class IBusDecoder(
             repeat(total) { buf.removeFirst() }
             remember(msg)
             if (pdcCapture && (msg[0] == 0x60 || msg[2] == 0x60)) onPdcFrame(msg)
+            if (busCapture) onBusFrame(msg)
             val typeKey = (msg[0] shl 8) or (if (msg.size > 3) msg[3] else 0xFFF)
             if (seenTypes.add(typeKey)) onNewType(msg)
             handle(msg)

@@ -60,6 +60,37 @@ class IBusDecoderTest {
         assertEquals(KeyPosition.OFF, IBusDecoder.keyPosition(0x00))
     }
 
+    // --- whole-bus capture: the only trustworthy way to learn a telegram is to watch the car ---
+
+    @Test fun bus_capture_delivers_every_valid_frame() {
+        val seen = mutableListOf<IntArray>()
+        val d = IBusDecoder(nowMs = { 0L }, emit = {}, onBusFrame = { seen.add(it) })
+        d.busCapture = true
+        val speed = bytes(0x80, 0x05, 0xBF, 0x18, 0x32, 0x1B, 0x0B)
+        val key = bytes(0x80, 0x04, 0xBF, 0x11, 0x03, 0x29)
+        d.feed(speed, speed.size); d.feed(key, key.size)
+        assertEquals(2, seen.size)
+        assertEquals(0x18, seen[0][3])
+        assertEquals(0x11, seen[1][3])
+    }
+
+    @Test fun bus_capture_off_delivers_nothing() {
+        val seen = mutableListOf<IntArray>()
+        val d = IBusDecoder(nowMs = { 0L }, emit = {}, onBusFrame = { seen.add(it) })
+        val f = bytes(0x80, 0x05, 0xBF, 0x18, 0x32, 0x1B, 0x0B)
+        d.feed(f, f.size)
+        assertEquals(0, seen.size)
+    }
+
+    @Test fun bus_capture_skips_frames_with_a_bad_checksum() {
+        val seen = mutableListOf<IntArray>()
+        val d = IBusDecoder(nowMs = { 0L }, emit = {}, onBusFrame = { seen.add(it) })
+        d.busCapture = true
+        val bad = bytes(0x80, 0x05, 0xBF, 0x18, 0x32, 0x1B, 0x00)
+        d.feed(bad, bad.size)
+        assertEquals("a corrupted frame is worse than no frame when we intend to replay it", 0, seen.size)
+    }
+
     @Test fun rejects_bad_checksum() {
         assertNull(decodeLast(bytes(0x80, 0x05, 0xBF, 0x18, 0x32, 0x1B, 0x00)))
     }

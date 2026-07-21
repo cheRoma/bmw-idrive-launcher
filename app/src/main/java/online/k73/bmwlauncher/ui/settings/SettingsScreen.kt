@@ -56,11 +56,11 @@ fun SettingsScreen(
     onSetDefault: () -> Unit,
     logState: LogSendState,
     onSendLogs: () -> Unit,
-    /** False when the I-Bus adapter isn't connected — nothing mirror-related can work then. */
-    mirrorsAvailable: Boolean = false,
-    onMirrorAutoFold: (Boolean) -> Unit = {},
-    onFoldMirrors: () -> Unit = {},
-    onUnfoldMirrors: () -> Unit = {},
+    /** False when the I-Bus adapter isn't connected — nothing bus-related can work then. */
+    ibusConnected: Boolean = false,
+    busCapturing: Boolean = false,
+    busFrames: Int = 0,
+    onToggleBusCapture: () -> Unit = {},
     onBack: () -> Unit,
 ) {
     val c = LocalLauncherColors.current
@@ -104,10 +104,23 @@ fun SettingsScreen(
             }
         }
         RowDivider()
-        // Mirror rows removed 2026-07-21: the documented "mirror" job turned out to drive the
-        // WINDOWS on this car's General Module — the fold button rolled the windows down while
-        // parked. Nothing goes back on screen until the right channel is captured from the car's
-        // own fold button.
+        // Read-only bus recorder. This exists because guessing a telegram from documentation put the
+        // windows down on a parked car: the only trustworthy source is what the car itself emits
+        // when its own button is pressed. Nothing is written to the bus while recording.
+        SettingRow(
+            title = "Записать шину",
+            subtitle = when {
+                !ibusConnected -> "Нет связи с I-Bus — проверьте адаптер"
+                busCapturing -> "Идёт запись · кадров: $busFrames — нажмите нужную кнопку в машине"
+                else -> "Для расшифровки команд: включить, нажать кнопку в машине, выключить"
+            },
+        ) {
+            AmberPill(
+                if (busCapturing) "Стоп" else "Записать",
+                onClick = onToggleBusCapture,
+                enabled = ibusConnected,
+            )
+        }
         RowDivider()
         UpdateRow(currentVersion, hasRoot, updateState, onCheckUpdate, onInstallUpdate)
         RowDivider()
