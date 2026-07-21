@@ -43,6 +43,7 @@ class IBusReader(private val appContext: Context) {
         emit = { snap ->
             snap.speedKmh?.let { trip.onSpeed(it, System.currentTimeMillis()) }
             _data.value = snap.copy(avgSpeedKmh = trip.averageKmh.roundToInt().takeIf { trip.hasData })
+            onSnapshotForMirrors(snap)
         },
         // Log one example of each distinct message type so an uploaded log inventories the whole bus
         // (this is how we decode fuel/consumption/etc. from real data).
@@ -65,6 +66,11 @@ class IBusReader(private val appContext: Context) {
     val pdcStats: StateFlow<PdcStats> = _pdcStats
     private val pdcLock = Any()
     @Volatile private var pollThread: Thread? = null
+
+    /** Mirror automation: off until the user turns it on (and only after the manual buttons work). */
+    @Volatile var mirrorAutoEnabled = false
+    private var lastKeyPosition: KeyPosition? = null
+    private var lastMirrorActionMs = 0L
 
     /** Frames arrive on the serial IO thread, `sent` increments on the poll thread — hence the lock. */
     private fun bumpPdc(isReply: Boolean) = synchronized(pdcLock) {
@@ -208,6 +214,58 @@ class IBusReader(private val appContext: Context) {
         return ok
     }
 
+    /**
+     * Fold / unfold the side mirrors. See [MirrorTelegrams] for the bytes and why the pair is
+     * repeated. Returns false only when there is no open port — the bus itself never answers, so a
+     * true here means "sent", not "the mirrors moved".
+     */
+    fun foldMirrors(): Boolean = sendMirrorSequence(fold = true)
+
+    fun unfoldMirrors(): Boolean = sendMirrorSequence(fold = false)
+
+    private fun sendMirrorSequence(fold: Boolean): Boolean {
+        val p = port ?: run { AppLog.w("MIRROR", "no open port — adapter not connected"); return false }
+        val what = if (fold) "fold" else "unfold"
+        // Off-thread: the full sequence takes ~3 s and this is called from the serial reader thread.
+        Thread {
+            val frames = MirrorTelegrams.sequence(fold)
+            var failed = 0
+            repeat(MirrorTelegrams.REPEATS) {
+                frames.forEachIndexed { i, f ->
+                    runCatching { p.write(ByteArray(f.size) { f[it].toByte() }, 300) }
+                        .onFailure { failed++; AppLog.w("MIRROR", "$what write failed: ${it.message}") }
+                    if (i < frames.lastIndex) runCatching { Thread.sleep(MirrorTelegrams.GAP_BETWEEN_SIDES_MS) }
+                }
+                runCatching { Thread.sleep(MirrorTelegrams.GAP_BETWEEN_REPEATS_MS) }
+            }
+            AppLog.d("MIRROR", "$what sequence sent (${MirrorTelegrams.REPEATS} repeats, $failed write errors)")
+        }.apply { isDaemon = true }.start()
+        return true
+    }
+
+    /**
+     * Key-position edges move the mirrors when the user has switched the automation on. Kept here
+     * because this reader is the only thing alive process-wide that sees the bus; the rules
+     * themselves live in [MirrorAutomation] so they can be tested without a car.
+     */
+    private fun onSnapshotForMirrors(snap: BordData) {
+        val now = snap.keyPosition ?: return
+        val prev = lastKeyPosition
+        lastKeyPosition = now
+        val action = MirrorAutomation.decide(prev, now, mirrorAutoEnabled, snap.speedKmh) ?: return
+        val t = System.currentTimeMillis()
+        if (t - lastMirrorActionMs < MIRROR_DEBOUNCE_MS) {
+            AppLog.d("MIRROR", "skip $action — only ${t - lastMirrorActionMs} ms since the last one")
+            return
+        }
+        lastMirrorActionMs = t
+        AppLog.d("MIRROR", "key $prev -> $now → $action")
+        when (action) {
+            MirrorAction.FOLD -> foldMirrors()
+            MirrorAction.UNFOLD -> unfoldMirrors()
+        }
+    }
+
     /** Reset the trip average speed (and its distance). */
     fun resetTrip() {
         trip.reset()
@@ -225,5 +283,7 @@ class IBusReader(private val appContext: Context) {
     private companion object {
         const val CP210X_VID = 0x10C4          // 4292 — Silicon Labs
         const val ACTION_PERM = "online.k73.bmwlauncher.USB_PERMISSION"
+        // A glitchy frame must not be able to make the mirror motors chatter.
+        const val MIRROR_DEBOUNCE_MS = 5_000L
     }
 }

@@ -28,6 +28,38 @@ class IBusDecoderTest {
         assertEquals(90, d?.coolantC)
     }
 
+    // --- key position (0x11) — drives the mirror automation, so the ladder must be exact ---
+
+    @Test fun decodes_key_off() {
+        val d = decodeLast(bytes(0x80, 0x04, 0xBF, 0x11, 0x00, 0x2A))
+        assertEquals(KeyPosition.OFF, d?.keyPosition)
+        assertEquals(false, d?.ignition)
+    }
+
+    @Test fun decodes_key_acc() {
+        val d = decodeLast(bytes(0x80, 0x04, 0xBF, 0x11, 0x01, 0x2B))
+        assertEquals(KeyPosition.ACC, d?.keyPosition)
+        assertEquals(true, d?.ignition)
+    }
+
+    @Test fun decodes_key_ignition() {
+        val d = decodeLast(bytes(0x80, 0x04, 0xBF, 0x11, 0x03, 0x29))
+        assertEquals(KeyPosition.IGNITION, d?.keyPosition)
+    }
+
+    @Test fun decodes_key_start() {
+        val d = decodeLast(bytes(0x80, 0x04, 0xBF, 0x11, 0x07, 0x2D))
+        assertEquals(KeyPosition.START, d?.keyPosition)
+    }
+
+    @Test fun key_position_takes_the_highest_live_terminal() {
+        // Cranking leaves KL_R and KL_15 set as well — START must still win.
+        assertEquals(KeyPosition.START, IBusDecoder.keyPosition(0x07))
+        assertEquals(KeyPosition.IGNITION, IBusDecoder.keyPosition(0x03))
+        assertEquals(KeyPosition.ACC, IBusDecoder.keyPosition(0x01))
+        assertEquals(KeyPosition.OFF, IBusDecoder.keyPosition(0x00))
+    }
+
     @Test fun rejects_bad_checksum() {
         assertNull(decodeLast(bytes(0x80, 0x05, 0xBF, 0x18, 0x32, 0x1B, 0x00)))
     }

@@ -6,6 +6,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import online.k73.bmwlauncher.car.IBusService
+import online.k73.bmwlauncher.data.SettingsStore
 import online.k73.bmwlauncher.diag.AnrWatchdog
 import online.k73.bmwlauncher.diag.AppLog
 import online.k73.bmwlauncher.diag.CrashHandler
@@ -32,6 +34,16 @@ class MainApplication : Application() {
             // A crash from a previous run left a pending report — send (and it self-deletes) now.
             if (File(filesDir, CrashHandler.PENDING_CRASH).exists()) {
                 diagScope.launch { runCatching { LogUploader.upload(this@MainApplication, "crash") } }
+            }
+            // Mirror automation reacts to the key being switched off, which is exactly when no
+            // screen of ours is in the foreground — so the setting is fed to the process-wide
+            // reader here rather than from a Composable.
+            diagScope.launch {
+                runCatching {
+                    SettingsStore(this@MainApplication).flow.collect { s ->
+                        IBusService.get(this@MainApplication).mirrorAutoEnabled = s.mirrorAutoFold
+                    }
+                }
             }
         }
     }

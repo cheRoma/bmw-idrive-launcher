@@ -19,6 +19,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
@@ -387,6 +388,9 @@ class HomeActivity : ComponentActivity() {
                         val hasRoot by hasRootState
                         val isDefault by isDefaultLauncherState
                         val logSend by logState
+                        // Same process-wide reader the home screen uses; mirror commands need its port.
+                        val ibus = remember { IBusService.get(applicationContext) }
+                        val ibusData by ibus.data.collectAsState()
                         SettingsScreen(
                             settings = settings,
                             onAutostart = { lifecycleScope.launch { store.setAutostartIBus(it) } },
@@ -401,6 +405,10 @@ class HomeActivity : ComponentActivity() {
                             onSetDefault = { requestDefaultLauncher() },
                             logState = logSend,
                             onSendLogs = { onSendLogs() },
+                            mirrorsAvailable = ibusData.connected,
+                            onMirrorAutoFold = { lifecycleScope.launch { store.setMirrorAutoFold(it) } },
+                            onFoldMirrors = { lifecycleScope.launch(Dispatchers.IO) { ibus.foldMirrors() } },
+                            onUnfoldMirrors = { lifecycleScope.launch(Dispatchers.IO) { ibus.unfoldMirrors() } },
                             onBack = { nav.popBackStack() },
                         )
                     }
