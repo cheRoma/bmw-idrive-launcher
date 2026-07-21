@@ -224,6 +224,15 @@ class IBusReader(private val appContext: Context) {
     fun unfoldMirrors(): Boolean = sendMirrorSequence(fold = false)
 
     private fun sendMirrorSequence(fold: Boolean): Boolean {
+        // DISABLED 2026-07-21 after a live test: on THIS car's General Module the documented
+        // "mirror" job (0C 01 31 / 0C 02 31) drives the WINDOWS, not the mirror motors — pressing
+        // fold rolled the windows down with the car parked. The published E39/E53 mapping does not
+        // hold for this GM, so nothing goes on the bus until the right channel is identified from a
+        // capture of the car's own fold button. See docs/superpowers/specs/2026-07-21-mirror-fold-design.md.
+        if (!MIRROR_COMMANDS_ENABLED) {
+            AppLog.w("MIRROR", "disabled — the documented mirror job opens the windows on this car")
+            return false
+        }
         val p = port ?: run { AppLog.w("MIRROR", "no open port — adapter not connected"); return false }
         val what = if (fold) "fold" else "unfold"
         // Off-thread: the full sequence takes ~3 s and this is called from the serial reader thread.
@@ -252,6 +261,8 @@ class IBusReader(private val appContext: Context) {
         val now = snap.keyPosition ?: return
         val prev = lastKeyPosition
         lastKeyPosition = now
+        // Hard off: see sendMirrorSequence. The decision logic and its tests stay, the bus does not.
+        if (!MIRROR_COMMANDS_ENABLED) return
         val action = MirrorAutomation.decide(prev, now, mirrorAutoEnabled, snap.speedKmh) ?: return
         val t = System.currentTimeMillis()
         if (t - lastMirrorActionMs < MIRROR_DEBOUNCE_MS) {
@@ -285,5 +296,8 @@ class IBusReader(private val appContext: Context) {
         const val ACTION_PERM = "online.k73.bmwlauncher.USB_PERMISSION"
         // A glitchy frame must not be able to make the mirror motors chatter.
         const val MIRROR_DEBOUNCE_MS = 5_000L
+        // Kill switch — the telegram we had actuates the windows on this car. Do not flip back on
+        // without a capture proving which channel is the mirrors.
+        const val MIRROR_COMMANDS_ENABLED = false
     }
 }

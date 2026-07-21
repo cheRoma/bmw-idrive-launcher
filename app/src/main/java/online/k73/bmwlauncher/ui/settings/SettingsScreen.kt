@@ -104,25 +104,10 @@ fun SettingsScreen(
             }
         }
         RowDivider()
-        SettingRow(
-            title = "Складывать зеркала",
-            subtitle = if (mirrorsAvailable) {
-                "При выключении зажигания · раскладывать при пуске"
-            } else {
-                "Нет связи с I-Bus — проверьте адаптер"
-            },
-        ) {
-            AmberSwitch(settings.mirrorAutoFold && mirrorsAvailable, onMirrorAutoFold, enabled = mirrorsAvailable)
-        }
-        RowDivider()
-        // Manual control: the automation is only trustworthy once these two have visibly moved the
-        // mirrors in the car, since the alternative way to test it is switching off a real engine.
-        SettingRow(title = "Проверить зеркала", subtitle = "Отправить команду вручную") {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                AmberPill("Сложить", onFoldMirrors, enabled = mirrorsAvailable)
-                AmberPill("Разложить", onUnfoldMirrors, enabled = mirrorsAvailable)
-            }
-        }
+        // Mirror rows removed 2026-07-21: the documented "mirror" job turned out to drive the
+        // WINDOWS on this car's General Module — the fold button rolled the windows down while
+        // parked. Nothing goes back on screen until the right channel is captured from the car's
+        // own fold button.
         RowDivider()
         UpdateRow(currentVersion, hasRoot, updateState, onCheckUpdate, onInstallUpdate)
         RowDivider()
