@@ -53,12 +53,16 @@ object AppLog {
     }
 
     /**
-     * Add a raw parking-module frame line. Separate buffer from [add] so a capture session neither
+     * Add a captured bus/parking frame. Separate buffer from [add] so a capture session neither
      * evicts the event log nor gets evicted by it — both survive into the uploaded report.
+     *
+     * Every line is timestamped: without it there is no way to tell "the button emits nothing on
+     * the bus" from "the recording simply wasn't running when the button was pressed".
      */
     fun pdc(line: String) {
+        val stamped = synchronized(timeFmt) { timeFmt.format(Date(System.currentTimeMillis())) } + "  " + line
         synchronized(pdcBuffer) {
-            pdcBuffer.addLast(line)
+            pdcBuffer.addLast(stamped)
             while (pdcBuffer.size > PDC_CAP) pdcBuffer.removeFirst()
         }
     }
