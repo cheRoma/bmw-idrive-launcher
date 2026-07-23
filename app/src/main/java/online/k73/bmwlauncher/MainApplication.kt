@@ -10,6 +10,7 @@ import online.k73.bmwlauncher.car.IBusService
 import online.k73.bmwlauncher.data.SettingsStore
 import online.k73.bmwlauncher.diag.AnrWatchdog
 import online.k73.bmwlauncher.diag.AppLog
+import online.k73.bmwlauncher.diag.BlackScreenWatchdog
 import online.k73.bmwlauncher.diag.CrashHandler
 import online.k73.bmwlauncher.diag.LogUploader
 import java.io.File
@@ -30,6 +31,11 @@ class MainApplication : Application() {
             AnrWatchdog.start(this, onHang = {
                 // Watchdog already debounces + calls this off its own thread; upload the snapshot.
                 diagScope.launch { runCatching { LogUploader.upload(this@MainApplication, "anr") } }
+            })
+            // Black-screen detector: catches the blank-window-with-live-main-thread failure the ANR
+            // watchdog can't see (lost GL surface after ACC sleep/wake). One report per episode.
+            BlackScreenWatchdog.start(this, onBlack = {
+                diagScope.launch { runCatching { LogUploader.upload(this@MainApplication, "blackscreen") } }
             })
             // A crash from a previous run left a pending report — send (and it self-deletes) now.
             if (File(filesDir, CrashHandler.PENDING_CRASH).exists()) {
