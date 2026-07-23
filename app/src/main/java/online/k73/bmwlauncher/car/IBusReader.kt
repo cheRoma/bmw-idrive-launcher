@@ -14,6 +14,8 @@ import com.hoho.android.usbserial.util.SerialInputOutputManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import online.k73.bmwlauncher.diag.AppLog
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
 
 /**
@@ -33,6 +35,18 @@ class IBusReader(private val appContext: Context) {
     private var receiver: BroadcastReceiver? = null
     @Volatile private var rxLog = 0
     @Volatile private var typeLog = 0
+
+    // Reconnect state: the single-owner USB adapter blips off the bus on ignition/ACC power dips and
+    // when a launcher restart races for it. `stopped` gates all reconnect work after stop(); one
+    // reconnect is coalesced via `reconnectPending`; `backoffMs` climbs 1→2→5 s and resets on a
+    // healthy connect or a hotplug ATTACH.
+    @Volatile private var stopped = false
+    @Volatile private var reconnectPending = false
+    @Volatile private var backoffMs = 0L
+    private var hotplugReceiver: BroadcastReceiver? = null
+    private val scheduler by lazy {
+        Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "ibus-reconnect").apply { isDaemon = true } }
+    }
 
     // Trip average speed (time-weighted, includes stops). Lives here so it accumulates whenever the
     // car moves — even with the Борткомпьютер screen closed — since IBusService is process-wide.
@@ -161,19 +175,31 @@ class IBusReader(private val appContext: Context) {
     }
 
     fun start() {
-        runCatching { connect() }.onFailure { AppLog.w("IBUS", "start failed: ${it.message}") }
+        stopped = false
+        registerHotplug()
+        runCatching { connect() }.onFailure {
+            AppLog.w("IBUS", "start failed: ${it.message}")
+            scheduleReconnect("start failed")
+        }
     }
 
+    @Synchronized
     private fun connect() {
+        // Already have a live connection — a stray start()/hotplug event must not tear it down.
+        if (_data.value.connected && io != null && port != null) return
+        closePort()   // release any stale handle before re-claiming the single-owner device
         val usb = appContext.getSystemService(Context.USB_SERVICE) as? UsbManager ?: return
         val driver = UsbSerialProber.getDefaultProber().findAllDrivers(usb)
             .firstOrNull { it.device.vendorId == CP210X_VID }   // the Resler I-Bus↔USB adapter
-            ?: run { AppLog.d("IBUS", "no CP210x adapter found"); return }
+            ?: run { AppLog.d("IBUS", "no CP210x adapter found"); scheduleReconnect("no adapter"); return }
         if (!usb.hasPermission(driver.device)) {
-            requestPermission(usb, driver.device); return
+            requestPermission(usb, driver.device); return   // grant re-enters start(); no timed retry here
         }
         val connection = usb.openDevice(driver.device)
-            ?: run { AppLog.w("IBUS", "openDevice failed — port busy (OEM app still running?)"); return }
+            ?: run {
+                AppLog.w("IBUS", "openDevice failed — port busy (OEM app still running?)")
+                scheduleReconnect("port busy"); return
+            }
         val p = driver.ports.first()
         p.open(connection)
         p.setParameters(9600, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_EVEN)   // I-Bus = 9600 8E1
@@ -186,13 +212,90 @@ class IBusReader(private val appContext: Context) {
                 }
             }
 
+            // A USB blip (ignition/ACC power dip, re-enumeration, or a restart racing for the device)
+            // used to kill the feed for the rest of the session — onRunError only logged. Now we drop
+            // the dead handle and reconnect with backoff so the Борткомпьютер comes back on its own.
             override fun onRunError(e: Exception) {
                 AppLog.w("IBUS", "run error: ${e.message}")
                 _data.value = _data.value.copy(connected = false)
+                scheduleReconnect("run error")
             }
         }).also { it.start() }
+        rxLog = 0
+        backoffMs = 0L   // healthy again — reset the backoff ladder
         _data.value = _data.value.copy(connected = true)
         AppLog.d("IBUS", "connected to CP210x @9600 8E1")
+    }
+
+    /** Release the serial manager and USB port without touching receivers (used before a reconnect). */
+    private fun closePort() {
+        runCatching { io?.stop() }
+        runCatching { port?.close() }
+        io = null; port = null
+    }
+
+    /**
+     * Re-attempt [connect] after a transient failure, backing off 1 → 2 → 5 s (capped) so a wedged
+     * adapter is retried without spinning. Coalesced (one pending attempt at a time), a no-op once
+     * [stop] has run, and re-arms itself if the retry also fails. A hotplug ATTACH resets the ladder.
+     */
+    private fun scheduleReconnect(reason: String) {
+        if (stopped) return
+        synchronized(this) {
+            if (reconnectPending) return
+            reconnectPending = true
+        }
+        backoffMs = when (backoffMs) {
+            0L -> 1_000L
+            1_000L -> 2_000L
+            else -> 5_000L
+        }
+        AppLog.d("IBUS", "reconnect in $backoffMs ms ($reason)")
+        runCatching {
+            scheduler.schedule({
+                reconnectPending = false
+                if (!stopped) runCatching { connect() }
+                    .onFailure { AppLog.w("IBUS", "reconnect failed: ${it.message}"); scheduleReconnect("retry") }
+            }, backoffMs, TimeUnit.MILLISECONDS)
+        }.onFailure { reconnectPending = false }
+    }
+
+    /**
+     * Listen for the CP210x arriving on / leaving the USB bus. On attach we reconnect immediately
+     * (off the main thread); on detach we drop the handle so the next attach opens a fresh one.
+     * Registered once, idempotent.
+     */
+    private fun registerHotplug() {
+        if (hotplugReceiver != null) return
+        val r = object : BroadcastReceiver() {
+            override fun onReceive(c: Context, i: Intent) {
+                @Suppress("DEPRECATION")
+                val dev = i.getParcelableExtra(UsbManager.EXTRA_DEVICE) as? UsbDevice
+                if (dev?.vendorId != CP210X_VID) return
+                when (i.action) {
+                    UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
+                        AppLog.d("IBUS", "CP210x attached — reconnecting")
+                        backoffMs = 0L
+                        if (!stopped) runCatching { scheduler.execute { runCatching { connect() } } }
+                    }
+                    UsbManager.ACTION_USB_DEVICE_DETACHED -> {
+                        AppLog.d("IBUS", "CP210x detached")
+                        _data.value = _data.value.copy(connected = false)
+                        closePort()
+                    }
+                }
+            }
+        }
+        hotplugReceiver = r
+        val filter = IntentFilter().apply {
+            addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
+            addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
+        }
+        if (Build.VERSION.SDK_INT >= 33) {
+            appContext.registerReceiver(r, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag") appContext.registerReceiver(r, filter)
+        }
     }
 
     private fun requestPermission(usb: UsbManager, device: UsbDevice) {
@@ -313,10 +416,11 @@ class IBusReader(private val appContext: Context) {
     }
 
     fun stop() {
-        runCatching { io?.stop() }
-        runCatching { port?.close() }
+        stopped = true   // any already-scheduled reconnect becomes a no-op
+        closePort()
         runCatching { receiver?.let { appContext.unregisterReceiver(it) } }
-        io = null; port = null; receiver = null
+        runCatching { hotplugReceiver?.let { appContext.unregisterReceiver(it) } }
+        receiver = null; hotplugReceiver = null
         _data.value = _data.value.copy(connected = false)
     }
 
