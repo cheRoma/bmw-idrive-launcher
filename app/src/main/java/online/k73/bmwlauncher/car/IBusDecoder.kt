@@ -87,9 +87,15 @@ class IBusDecoder(
                 0x19 -> if (m.size >= 6) next = next.copy(outsideC = signed(m[4]), coolantC = signed(m[5]))
                 0x11 -> if (m.size >= 5) {
                     val key = keyPosition(m[4])
-                    next = next.copy(ignition = key != KeyPosition.OFF, keyPosition = key)
+                    next = next.copy(ignition = key != KeyPosition.OFF, keyPosition = key, keyRaw = m[4])
                 }
             }
+        }
+        // General Module door/lock status (`00 05 BF 7A <flags> 10 <chk>`). Confirmed on this car:
+        // bit 0x20 of the flags byte = central locking engaged (lock press = 0x60, unlock = 0x50);
+        // door-open frames (bit 0x01) leave it clear. Drives the auto mirror fold/unfold.
+        if (src == 0x00 && cmd == 0x7A && m.size >= 5) {
+            next = next.copy(locked = (m[4] and 0x20) != 0)
         }
         if (next != cur) {
             cur = next.copy(connected = true, updatedAtMs = nowMs())

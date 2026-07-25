@@ -7,10 +7,13 @@ package online.k73.bmwlauncher.car
  * General Module (ZKE body controller, node `0x00`) to run job `0x0C` for one side. The GM then
  * decides whether the car is in a state where folding is allowed and drives the mirror modules.
  *
- * Bytes verified from two independent sources that agree exactly: the decompiled OEM «i-Bus App»
- * 2.2.1.4 (fields `e0`/`f0`/`g0`/`h0` of its Control screen), which is what actually folded the
- * mirrors in this car, and the public I-Bus command lists that assign the same set to E39/E53.
- * See docs/superpowers/specs/2026-07-21-mirror-fold-design.md.
+ * Bytes CONFIRMED ON THE CAR 2026-07-23 by probing each GM 0x0C code and watching the mirrors:
+ *   `3F 06 00 0C 02 39 01 0F` folds the RIGHT mirror, `01 39` folds the LEFT;
+ *   `3F 06 00 0C 02 3A 01 0C` unfolds the RIGHT, `01 3A` unfolds the LEFT.
+ * So on THIS car the mirror direction byte is **0x39 = fold, 0x3A = unfold** — NOT the 0x31/0x30
+ * from the public lists / OEM Control-screen fields, which on this GM drive the WINDOWS (window
+ * incident 2026-07-21). See docs/superpowers/specs/2026-07-21-mirror-fold-design.md and
+ * ~/bmw-ibus-recon/ibus-write-catalog.md.
  */
 object MirrorTelegrams {
     private const val DIAG = 0x3F      // us, posing as the diagnostic tester
@@ -19,10 +22,10 @@ object MirrorTelegrams {
     private const val JOB = 0x0C       // "actuate mirror"
     private const val ARG = 0x01       // constant tail parameter in every documented mirror job
 
-    const val SIDE_DRIVER = 0x01
-    const val SIDE_PASSENGER = 0x02
-    const val DIR_FOLD = 0x31
-    const val DIR_UNFOLD = 0x30
+    const val SIDE_DRIVER = 0x01       // left
+    const val SIDE_PASSENGER = 0x02    // right
+    const val DIR_FOLD = 0x39          // confirmed on the car — 0x31 was WINDOWS
+    const val DIR_UNFOLD = 0x3A        // confirmed on the car — 0x30 was WINDOWS
 
     /** XOR of every byte — how the I-Bus checksums a frame. */
     fun checksum(bytes: IntArray): Int = bytes.fold(0) { acc, b -> acc xor b }

@@ -8,6 +8,7 @@ import android.content.IntentFilter
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.os.Build
+import android.os.PowerManager
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
 import com.hoho.android.usbserial.util.SerialInputOutputManager
@@ -112,7 +113,7 @@ class IBusReader(private val appContext: Context) {
 
     /** Mirror automation: off until the user turns it on (and only after the manual buttons work). */
     @Volatile var mirrorAutoEnabled = false
-    private var lastKeyPosition: KeyPosition? = null
+    private var lastIgnitionOn: Boolean? = null
     private var lastMirrorActionMs = 0L
 
     /** Frames arrive on the serial IO thread, `sent` increments on the poll thread — hence the lock. */
@@ -347,6 +348,29 @@ class IBusReader(private val appContext: Context) {
     }
 
     /**
+     * Send one probe telegram from the bus-probe screen. Off-thread (blocking USB write), repeated
+     * a few times because the single-wire bus drops frames. EVERY send is written to the bus log
+     * (`AppLog.pdc`) so an uploaded capture correlates "tapped X on the probe → the car did Y". The
+     * frame already carries its checksum (built in [ProbeCmd]); we only convert + write. Returns
+     * false only when there is no open port. The ignition gate + per-tap confirm live in the UI.
+     */
+    fun sendProbe(frame: IntArray, label: String): Boolean {
+        val p = port ?: run { AppLog.w("PROBE", "no open port — adapter not connected"); return false }
+        val bytes = ByteArray(frame.size) { frame[it].toByte() }
+        val hex = frame.joinToString(" ") { "%02X".format(it) }
+        AppLog.pdc(">> ПРОБНИК: $label → $hex")
+        Thread {
+            var failed = 0
+            repeat(PROBE_REPEATS) {
+                runCatching { p.write(bytes, 300) }.onFailure { failed++; AppLog.w("PROBE", "write failed: ${it.message}") }
+                runCatching { Thread.sleep(PROBE_GAP_MS) }
+            }
+            AppLog.d("PROBE", "sent '$label' ($hex) — $failed write errors")
+        }.apply { isDaemon = true }.start()
+        return true
+    }
+
+    /**
      * Fold / unfold the side mirrors. See [MirrorTelegrams] for the bytes and why the pair is
      * repeated. Returns false only when there is no open port — the bus itself never answers, so a
      * true here means "sent", not "the mirrors moved".
@@ -385,27 +409,53 @@ class IBusReader(private val appContext: Context) {
     }
 
     /**
-     * Key-position edges move the mirrors when the user has switched the automation on. Kept here
-     * because this reader is the only thing alive process-wide that sees the bus; the rules
-     * themselves live in [MirrorAutomation] so they can be tested without a car.
+     * Ignition edges move the mirrors when the automation is on. Central-lock/unlock can't be used:
+     * the head unit sleeps the instant the ignition is off (confirmed on the car), so it isn't
+     * running when the fob is pressed on a parked car. The two moments we are guaranteed alive are
+     * the ignition transitions, so:
+     *  - ignition ON (incl. the first frame after boot) → UNFOLD — mirrors out before driving;
+     *  - ignition OFF edge → FOLD, under a brief wake lock so the send finishes before the unit sleeps.
      */
     private fun onSnapshotForMirrors(snap: BordData) {
-        val now = snap.keyPosition ?: return
-        val prev = lastKeyPosition
-        lastKeyPosition = now
-        // Hard off: see sendMirrorSequence. The decision logic and its tests stay, the bus does not.
-        if (!MIRROR_COMMANDS_ENABLED) return
-        val action = MirrorAutomation.decide(prev, now, mirrorAutoEnabled, snap.speedKmh) ?: return
+        val ign = when (snap.keyPosition ?: return) {
+            KeyPosition.IGNITION, KeyPosition.START -> true
+            else -> false
+        }
+        val prev = lastIgnitionOn
+        lastIgnitionOn = ign
+        if (!MIRROR_COMMANDS_ENABLED || !mirrorAutoEnabled) return
+        val action = when {
+            ign && prev != true -> MirrorAction.UNFOLD    // engine on / just booted into ignition
+            !ign && prev == true -> MirrorAction.FOLD      // key turned off — fold while we still can
+            else -> return
+        }
         val t = System.currentTimeMillis()
         if (t - lastMirrorActionMs < MIRROR_DEBOUNCE_MS) {
-            AppLog.d("MIRROR", "skip $action — only ${t - lastMirrorActionMs} ms since the last one")
+            AppLog.d("MIRROR", "skip $action — only ${t - lastMirrorActionMs} ms since the last action")
             return
         }
         lastMirrorActionMs = t
-        AppLog.d("MIRROR", "key $prev -> $now → $action")
         when (action) {
-            MirrorAction.FOLD -> foldMirrors()
-            MirrorAction.UNFOLD -> unfoldMirrors()
+            MirrorAction.UNFOLD -> {
+                AppLog.d("MIRROR", "зажигание ВКЛ → раскладываю зеркала")
+                unfoldMirrors()
+            }
+            MirrorAction.FOLD -> {
+                AppLog.d("MIRROR", "зажигание ВЫКЛ → складываю зеркала (wake-lock)")
+                acquireBriefWakeLock()
+                foldMirrors()
+            }
+        }
+    }
+
+    /** Keep the CPU alive ~6 s so an ignition-off fold can finish before the head unit suspends. */
+    private fun acquireBriefWakeLock() {
+        runCatching {
+            val pm = appContext.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return
+            pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "bmw:mirror-fold").apply {
+                setReferenceCounted(false)
+                acquire(6_000L)   // auto-releases after the timeout — cannot leak
+            }
         }
     }
 
@@ -426,11 +476,16 @@ class IBusReader(private val appContext: Context) {
 
     private companion object {
         const val CP210X_VID = 0x10C4          // 4292 — Silicon Labs
+        // Probe sends: the single-wire bus drops frames, so repeat a few times like the OEM app.
+        const val PROBE_REPEATS = 3
+        const val PROBE_GAP_MS = 120L
         const val ACTION_PERM = "online.k73.bmwlauncher.USB_PERMISSION"
-        // A glitchy frame must not be able to make the mirror motors chatter.
-        const val MIRROR_DEBOUNCE_MS = 5_000L
-        // Kill switch — the telegram we had actuates the windows on this car. Do not flip back on
-        // without a capture proving which channel is the mirrors.
-        const val MIRROR_COMMANDS_ENABLED = false
+        // Coalesce a bouncing lock signal, but stay shorter than a real lock→unlock gap so the
+        // unfold isn't swallowed (5 s ate it in testing). ~3 s ≈ one fold-sequence send, so a new
+        // action also can't overlap the previous one on the wire.
+        const val MIRROR_DEBOUNCE_MS = 3_000L
+        // Re-enabled 2026-07-23: the real mirror codes (0x39 fold / 0x3A unfold) were confirmed on
+        // the car, replacing the 0x31/0x30 that drove the windows. See [[MirrorTelegrams]].
+        const val MIRROR_COMMANDS_ENABLED = true
     }
 }
