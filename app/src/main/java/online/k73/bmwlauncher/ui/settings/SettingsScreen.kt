@@ -61,6 +61,8 @@ fun SettingsScreen(
     busCapturing: Boolean = false,
     busFrames: Int = 0,
     onToggleBusCapture: () -> Unit = {},
+    onOpenProbe: () -> Unit = {},
+    onMirrorAutoFold: (Boolean) -> Unit = {},
     onBack: () -> Unit,
 ) {
     val c = LocalLauncherColors.current
@@ -118,8 +120,22 @@ fun SettingsScreen(
             AmberPill(
                 if (busCapturing) "Стоп" else "Записать",
                 onClick = onToggleBusCapture,
-                enabled = ibusConnected,
+                enabled = ibusConnected || busCapturing,   // «Стоп» must always be tappable while recording
             )
+        }
+        RowDivider()
+        SettingRow(
+            title = "Складывать зеркала",
+            subtitle = "Складывать при выключении зажигания, раскладывать при включении",
+        ) {
+            AmberSwitch(settings.mirrorAutoFold, onMirrorAutoFold, enabled = ibusConnected)
+        }
+        RowDivider()
+        SettingRow(
+            title = "Пробник шины",
+            subtitle = "Ручная отправка телеграмм в I-Bus — осторожно (окна/замки)",
+        ) {
+            AmberPill("Открыть", onClick = onOpenProbe, enabled = ibusConnected)
         }
         RowDivider()
         UpdateRow(currentVersion, hasRoot, updateState, onCheckUpdate, onInstallUpdate)

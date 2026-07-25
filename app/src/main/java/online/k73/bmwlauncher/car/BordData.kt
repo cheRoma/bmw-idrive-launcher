@@ -18,6 +18,10 @@ data class BordData(
     val outsideC: Int? = null,
     val ignition: Boolean? = null,
     val keyPosition: KeyPosition? = null,
+    /** Raw IKE 0x11 terminal-status byte, for verifying the key decode on an unknown car. */
+    val keyRaw: Int? = null,
+    /** Central locking: true=locked, from the GM 0x7A door-status telegram (bit 0x20). */
+    val locked: Boolean? = null,
     val updatedAtMs: Long = 0L,
 )
 

@@ -56,6 +56,7 @@ import online.k73.bmwlauncher.car.IBusService
 import online.k73.bmwlauncher.ui.bordcomputer.BordComputerScreen
 import online.k73.bmwlauncher.ui.home.HomeCarousel
 import online.k73.bmwlauncher.ui.home.TileId
+import online.k73.bmwlauncher.ui.probe.BusProbeScreen
 import online.k73.bmwlauncher.ui.settings.SettingsScreen
 import online.k73.bmwlauncher.ui.theme.BmwLauncherTheme
 import java.time.LocalTime
@@ -146,7 +147,7 @@ class HomeActivity : ComponentActivity() {
         // Intent extra used by ButtonRedirectService to open a specific launcher screen (panel-button
         // redirect). Only these routes may be opened this way.
         const val EXTRA_NAV_ROUTE = "nav_route"
-        val VALID_ROUTES = setOf("music", "apps", "settings", "bordcomputer")
+        val VALID_ROUTES = setOf("music", "apps", "settings", "bordcomputer", "busprobe")
 
         // How long to let i-Bus initialize its I-Bus/USB link before we pull the launcher back to the
         // front. On non-root stock Android an activity launch is necessarily briefly visible; NO_ANIMATION
@@ -411,6 +412,19 @@ class HomeActivity : ComponentActivity() {
                             busCapturing = busCapturing,
                             busFrames = busFrames,
                             onToggleBusCapture = { ibus.setBusCapture(!busCapturing) },
+                            onOpenProbe = { nav.navigate("busprobe") },
+                            onMirrorAutoFold = { lifecycleScope.launch { store.setMirrorAutoFold(it) } },
+                            onBack = { nav.popBackStack() },
+                        )
+                    }
+                    composable("busprobe") {
+                        val ibus = remember { IBusService.get(applicationContext) }
+                        val d by ibus.data.collectAsState()
+                        BusProbeScreen(
+                            connected = d.connected,
+                            keyPosition = d.keyPosition,
+                            keyRaw = d.keyRaw,
+                            onSend = { ibus.sendProbe(it.frame, it.label) },
                             onBack = { nav.popBackStack() },
                         )
                     }

@@ -23,4 +23,7 @@ object IBusService {
 
     /** Toggle raw PDC frame capture (to decode parking distances from a reversing session). */
     fun setPdcCapture(context: Context, on: Boolean) = get(context).setPdcCapture(on)
+
+    /** Send one bus-probe telegram (from the Settings → «Пробник шины» screen). Off the main thread. */
+    fun sendProbe(context: Context, frame: IntArray, label: String): Boolean = get(context).sendProbe(frame, label)
 }
