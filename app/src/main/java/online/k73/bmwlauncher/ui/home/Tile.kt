@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import online.k73.bmwlauncher.ui.theme.LocalLauncherColors
 
-enum class TileId { MUSIC, NAV, APPS, IBUS, SETTINGS, CARPLAY, YOUTUBE }
+enum class TileId { MUSIC, NAV, APPS, IBUS, SETTINGS, CARPLAY, YOUTUBE, IVI }
 
 data class Tile(val id: TileId, val label: String, val icon: ImageVector, val priority: Boolean = false)
 

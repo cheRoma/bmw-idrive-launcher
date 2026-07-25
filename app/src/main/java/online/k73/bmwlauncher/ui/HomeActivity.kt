@@ -149,6 +149,10 @@ class HomeActivity : ComponentActivity() {
         const val EXTRA_NAV_ROUTE = "nav_route"
         val VALID_ROUTES = setOf("music", "apps", "settings", "bordcomputer", "busprobe")
 
+        // ИВИ ships as ru.ivi.client on phones and ru.ivi.client.tv on Android-TV builds; which one
+        // the head unit got is unverified (no tunnel yet), so the tile tries both.
+        val IVI_PACKAGES = arrayOf("ru.ivi.client", "ru.ivi.client.tv")
+
         // How long to let i-Bus initialize its I-Bus/USB link before we pull the launcher back to the
         // front. On non-root stock Android an activity launch is necessarily briefly visible; NO_ANIMATION
         // + a short settle shrinks the i-Bus flash to a flicker. Raise if i-Bus needs longer to connect.
@@ -369,6 +373,9 @@ class HomeActivity : ComponentActivity() {
                                     TileId.IBUS -> nav.navigate("bordcomputer")
                                     TileId.CARPLAY -> launcher.launch(settings.carplayPackage)
                                     TileId.YOUTUBE -> launcher.launch("com.google.android.youtube")
+                                    TileId.IVI -> if (!launcher.launchFirstInstalled(*IVI_PACKAGES)) {
+                                        AppLog.w("NAV", "ИВИ не найден: ${IVI_PACKAGES.joinToString()}")
+                                    }
                                 }
                             },
                         )
