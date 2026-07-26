@@ -337,6 +337,15 @@ class HomeActivity : ComponentActivity() {
             val isNight = ThemeResolver.isNight(settings.themeMode, now, settings.nightStartHour, settings.nightEndHour)
             BmwLauncherTheme(isNight = isNight) {
                 val nav = rememberNavController()
+                // Every screen change in the event log. Tile taps were already logged, but returns
+                // («Назад», the panel key, popBackStack) were not — and it is the return to the home
+                // carousel that rebuilds the map's GL context, so a black-screen report without this
+                // line leaves us inferring navigation from side effects.
+                LaunchedEffect(nav) {
+                    nav.currentBackStackEntryFlow.collect { entry ->
+                        AppLog.d("NAV", "route=${entry.destination.route}")
+                    }
+                }
                 // Open a screen requested from outside (panel-button redirect via ButtonRedirectService).
                 val route by pendingRoute
                 LaunchedEffect(route) {

@@ -39,9 +39,15 @@ import org.maplibre.android.maps.Style
 @Composable
 fun MapBackground(modifier: Modifier = Modifier) {
     if (LocalInspectionMode.current) return
+    // Switched off by the black-screen watchdog once it has decided the map is what killed the
+    // window (see MapRuntime) — the home screen then renders on the solid background as before.
+    if (!MapRuntime.enabled.value) return
     val ctx = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
+    // Numbered so the diagnostics show how many GL contexts this process has been through: leaving
+    // the home destination destroys the view, coming back builds another one.
+    val instance = remember { MapRuntime.nextInstance() }
     val mapView = remember {
         runCatching {
             MapLibre.getInstance(ctx)                 // no API key needed
@@ -53,7 +59,9 @@ fun MapBackground(modifier: Modifier = Modifier) {
             // background behind it, never a black window.
             val options = MapLibreMapOptions.createFromAttributes(ctx).textureMode(true)
             MapView(ctx, options).apply { onCreate(null) }
-        }.getOrNull()
+        }.onSuccess { AppLog.d("MAP", "view#$instance created (texture)") }
+            .onFailure { AppLog.w("MAP", "view#$instance create failed: ${it.message}") }
+            .getOrNull()
     } ?: return
 
     // Load our style, lock interaction, and follow the car's position.
@@ -116,6 +124,8 @@ fun MapBackground(modifier: Modifier = Modifier) {
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(obs)
             runCatching { mapView.onStop(); mapView.onDestroy() }
+            MapRuntime.onDestroyed()
+            AppLog.d("MAP", "view#$instance destroyed")
         }
     }
 

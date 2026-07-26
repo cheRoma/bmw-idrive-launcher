@@ -33,9 +33,10 @@ class MainApplication : Application() {
                 diagScope.launch { runCatching { LogUploader.upload(this@MainApplication, "anr") } }
             })
             // Black-screen detector: catches the blank-window-with-live-main-thread failure the ANR
-            // watchdog can't see (lost GL surface after ACC sleep/wake). One report per episode.
-            BlackScreenWatchdog.start(this, onBlack = {
-                diagScope.launch { runCatching { LogUploader.upload(this@MainApplication, "blackscreen") } }
+            // watchdog can't see, then repairs it. Two uploads per episode — the evidence when it
+            // breaks ("blackscreen") and, once pixels return, which repair worked ("blackscreen-ok").
+            BlackScreenWatchdog.start(this, onEvent = { reason ->
+                diagScope.launch { runCatching { LogUploader.upload(this@MainApplication, reason) } }
             })
             // A crash from a previous run left a pending report — send (and it self-deletes) now.
             if (File(filesDir, CrashHandler.PENDING_CRASH).exists()) {

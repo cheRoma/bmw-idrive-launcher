@@ -97,8 +97,15 @@ object LogUploader {
         }
     }
 
-    /** Dump our own process's logcat. Best-effort; returns "" on any failure. */
-    private fun captureLogcat(): String {
+    /**
+     * Dump our own process's logcat. Best-effort; returns "" on any failure. Also used by
+     * [BlackScreenWatchdog], with a smaller tail, to bake the driver's own errors into the report it
+     * persists — that copy is what survives when the car has no network at the time of the failure.
+     */
+    internal fun captureLogcat(
+        maxLines: Int = MAX_LOGCAT_LINES,
+        maxBytes: Int = MAX_LOGCAT_BYTES,
+    ): String {
         return try {
             // redirectErrorStream drains stderr into stdout — reading a single stream to EOF
             // then can't deadlock on an unread stderr pipe. `logcat -d` dumps and exits.
@@ -106,11 +113,11 @@ object LogUploader {
                 .redirectErrorStream(true)
                 .start()
             val lines = proc.inputStream.bufferedReader().useLines { seq ->
-                // Keep the tail: bounded deque of the last MAX_LOGCAT_LINES lines.
-                val deque = ArrayDeque<String>(MAX_LOGCAT_LINES)
+                // Keep the tail: bounded deque of the last maxLines lines.
+                val deque = ArrayDeque<String>(maxLines)
                 for (line in seq) {
                     deque.addLast(line)
-                    if (deque.size > MAX_LOGCAT_LINES) deque.removeFirst()
+                    if (deque.size > maxLines) deque.removeFirst()
                 }
                 deque.toList()
             }
@@ -118,8 +125,8 @@ object LogUploader {
                 if (!proc.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) proc.destroyForcibly()
             }
             var text = lines.joinToString("\n")
-            if (text.length > MAX_LOGCAT_BYTES) {
-                text = text.substring(text.length - MAX_LOGCAT_BYTES)
+            if (text.length > maxBytes) {
+                text = text.substring(text.length - maxBytes)
             }
             text
         } catch (_: Throwable) {

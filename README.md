@@ -256,6 +256,10 @@ The app self-updates so improvements ship without a flash drive:
 
 | Version | Highlights |
 |---|---|
+| **1.6.38** | **Black screen heals itself** — the detector now escalates through drop-the-map → recreate the activity → restart the process, and records which step brought the pixels back; its report gained a logcat tail, a GPU-bypassing software draw of the same window, a frame counter and the map's GL-context churn, so one occurrence is enough to name the broken layer |
+| **1.6.32–1.6.37** | **Real mirror fold codes** (0x39/0x3A — the earlier guess drove the *windows*), folding tied to the ignition rather than the door lock, a **bus probe** screen for trying telegrams safely, and an **ivi** tile beside YouTube |
+| **1.6.31** | **Durable black-screen detector** — samples the window's own pixels, so the blank-window-with-a-live-main-thread failure finally leaves evidence even when the car is offline |
+| **1.6.21–1.6.30** | HOME key always returns to the carousel and Back on the carousel stays put; PDC capture with live counters; **mirror automation** (first attempt); I-Bus **reconnects itself** after a USB drop; read-only **bus recorder** with timestamped frames |
 | **1.6.15–1.6.20** | Denser & bigger iDrive carousel; **reliable Back on every screen** (+ the hardware Back key, the only real panel key); **panel "Music" button → our own player** via an AccessibilityService redirect; **trip average speed** in the on-board computer (with reset); **PDC capture** — polls the parking module on the I-Bus to decode its distances |
 | **1.6.11–1.6.14** | Map rendered as a **TextureView** (fixes the black home screen after an ACC sleep/wake); one-tap **clear of the latched OBC speed limit** (the >6 km/h gong); hardware key-event logging; headless Yandex start (no app flash) |
 | **1.6.10** | On-board computer logs one example of **every distinct I-Bus message type** — groundwork for fuel / consumption / trip averages |
