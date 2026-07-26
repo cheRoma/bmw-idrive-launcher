@@ -7,10 +7,10 @@ import java.util.concurrent.atomic.AtomicInteger
  * Process-wide state of the live map backdrop.
  *
  * Two jobs, both born from the black-screen hunt:
- * - **counting** how many [MapBackground] views this process has created and destroyed. The map lives
- *   inside the home destination, so every trip to Музыка/Приложения and back tears down its GL
- *   context and builds a new one — the report needs that number to show how much churn preceded a
- *   dead window.
+ * - **counting** how many [MapBackground] views this process has created and destroyed. Since v1.6.39
+ *   the map is composed once by HomeActivity below the NavHost, so a healthy report reads
+ *   `created=1 destroyed=0` no matter how long the drive; anything else means the view is being
+ *   rebuilt again and the churn is back.
  * - an **off switch** the black-screen watchdog can pull. The map is the prime suspect, and dropping
  *   it is the cheapest repair we can try; the flag stays off until the process restarts, so a
  *   vanished map on the home screen is the visible sign that a black screen was healed.

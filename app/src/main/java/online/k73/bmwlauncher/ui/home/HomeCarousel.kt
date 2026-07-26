@@ -55,10 +55,10 @@ fun HomeCarousel(
     val startPage = (loops / 2) * tiles.size
     val pagerState = rememberPagerState(initialPage = startPage, pageCount = { loops * tiles.size })
 
-    BoxWithConstraints(Modifier.fillMaxSize().background(c.background)) {
-        // Live map (our dark+amber style) as the backdrop, behind everything. Renders nothing if the
-        // map is unavailable → the solid c.background above shows through (the previous look).
-        MapBackground(Modifier.fillMaxSize())
+    // No base fill here: the launcher background AND the live map are painted once by HomeActivity,
+    // below the NavHost, so the map survives a trip to Музыка instead of being rebuilt on return
+    // (see MapBackground). An opaque fill at this level would simply hide it.
+    BoxWithConstraints(Modifier.fillMaxSize()) {
         // Scrim over the map so it recedes into a calm backdrop and the tiles / status / dots stay
         // legible — darker at the top and bottom edges, lighter through the middle so the amber
         // street network still reads.

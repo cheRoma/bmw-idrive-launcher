@@ -10,6 +10,7 @@ import online.k73.bmwlauncher.music.ui.MusicScreen
 import online.k73.bmwlauncher.ui.theme.BmwLauncherTheme
 import org.junit.Rule
 import org.junit.Test
+import java.time.LocalDateTime
 
 class MusicScreenScreenshotTest {
     @get:Rule val paparazzi = Paparazzi(
@@ -19,19 +20,22 @@ class MusicScreenScreenshotTest {
         ),
     )
 
+    // Pinned clock: the top bar shows the time, so a live one made these goldens unverifiable.
+    private val at = LocalDateTime.of(2026, 7, 5, 19, 4)
+
     private val np = NowPlaying("Ночной город", "Дельфин", 84_000, 238_000, true, "like")
 
     @Test fun music_playing() {
         paparazzi.snapshot {
             BmwLauncherTheme(isNight = true) {
-                MusicScreen(MusicUiState.Playing(np), null, {}, {}, {}, {}, {}, {}, {}, {}, {})
+                MusicScreen(MusicUiState.Playing(np), null, {}, {}, {}, {}, {}, {}, {}, {}, {}, clock = at)
             }
         }
     }
     @Test fun music_no_playback() {
         paparazzi.snapshot {
             BmwLauncherTheme(isNight = true) {
-                MusicScreen(MusicUiState.NoPlayback, null, {}, {}, {}, {}, {}, {}, {}, {}, {})
+                MusicScreen(MusicUiState.NoPlayback, null, {}, {}, {}, {}, {}, {}, {}, {}, {}, clock = at)
             }
         }
     }

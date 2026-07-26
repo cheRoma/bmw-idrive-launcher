@@ -98,6 +98,9 @@ fun MusicScreen(
     onColdStartPlay: () -> Unit,
     onBack: () -> Unit,
     coldStart: ColdStartPhase = ColdStartPhase.IDLE,
+    // Screenshot tests pin the clock; in the car it stays null and the top bar ticks by itself.
+    // Without this the golden holds whatever minute it was recorded at and can never verify again.
+    clock: java.time.LocalDateTime? = null,
 ) {
     val c = LocalLauncherColors.current
     val playing = state as? MusicUiState.Playing
@@ -107,7 +110,7 @@ fun MusicScreen(
         // ── Background: album cover (Playing) or a dark fallback ──
         MusicBackground(if (playing != null) albumArt else null)
         Column(Modifier.fillMaxSize()) {
-            MusicTopBar(onBack)
+            MusicTopBar(onBack, clock)
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when (state) {
                     MusicUiState.NoPermission ->
@@ -163,9 +166,12 @@ private fun MusicBackground(art: ImageBitmap?) {
 
 // ── Top bar: back chevron (left) + clock (right); no amber divider on this screen ──
 @Composable
-private fun MusicTopBar(onBack: () -> Unit) {
-    var now by remember { mutableStateOf(java.time.LocalDateTime.now()) }
-    LaunchedEffect(Unit) { while (true) { now = java.time.LocalDateTime.now(); delay(10_000) } }
+private fun MusicTopBar(onBack: () -> Unit, clock: java.time.LocalDateTime? = null) {
+    var now by remember { mutableStateOf(clock ?: java.time.LocalDateTime.now()) }
+    LaunchedEffect(clock) {
+        if (clock != null) return@LaunchedEffect
+        while (true) { now = java.time.LocalDateTime.now(); delay(10_000) }
+    }
     Row(
         Modifier.fillMaxWidth().height(64.dp).padding(start = 18.dp, end = 32.dp),
         verticalAlignment = Alignment.CenterVertically,

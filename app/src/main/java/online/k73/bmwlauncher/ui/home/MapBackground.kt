@@ -45,8 +45,9 @@ fun MapBackground(modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // Numbered so the diagnostics show how many GL contexts this process has been through: leaving
-    // the home destination destroys the view, coming back builds another one.
+    // Numbered so the diagnostics show how many GL contexts this process has been through. Composed
+    // once by HomeActivity below the NavHost, this should stay at #1 for the whole drive; it used to
+    // climb by one on every return to the carousel.
     val instance = remember { MapRuntime.nextInstance() }
     val mapView = remember {
         runCatching {

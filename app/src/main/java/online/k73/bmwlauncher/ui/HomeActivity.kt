@@ -55,7 +55,13 @@ import online.k73.bmwlauncher.ui.apps.AppsScreen
 import online.k73.bmwlauncher.car.IBusService
 import online.k73.bmwlauncher.ui.bordcomputer.BordComputerScreen
 import online.k73.bmwlauncher.ui.home.HomeCarousel
+import online.k73.bmwlauncher.ui.home.MapBackground
 import online.k73.bmwlauncher.ui.home.TileId
+import online.k73.bmwlauncher.ui.theme.LocalLauncherColors
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
 import online.k73.bmwlauncher.ui.probe.BusProbeScreen
 import online.k73.bmwlauncher.ui.settings.SettingsScreen
 import online.k73.bmwlauncher.ui.theme.BmwLauncherTheme
@@ -359,125 +365,133 @@ class HomeActivity : ComponentActivity() {
                         pendingRoute.value = null
                     }
                 }
-                NavHost(nav, startDestination = "home") {
-                    composable("home") {
-                        // On the home carousel «Назад» is a no-op — we're already home and a HOME
-                        // launcher has nowhere to go back to. Without this, system BACK finishes the
-                        // Activity and reveals whatever task is behind us (e.g. Yandex, left by the
-                        // Music cold-start) → the user gets bounced out instead of staying home.
-                        BackHandler {}
-                        // Live outside temperature from the shared I-Bus reader → status bar.
-                        val ibus = remember { IBusService.get(applicationContext) }
-                        val bord by ibus.data.collectAsState()
-                        HomeCarousel(
-                            now = nowDateTime,
-                            temp = bord.outsideC?.let { "$it°" },
-                            onTile = { id ->
-                                AppLog.d("NAV", "tile tapped: $id")
-                                when (id) {
-                                    TileId.MUSIC -> nav.navigate("music")
-                                    TileId.APPS -> nav.navigate("apps")
-                                    TileId.SETTINGS -> nav.navigate("settings")
-                                    TileId.NAV -> launcher.launch(settings.navPackage)
-                                    TileId.IBUS -> nav.navigate("bordcomputer")
-                                    TileId.CARPLAY -> launcher.launch(settings.carplayPackage)
-                                    TileId.YOUTUBE -> launcher.launch("com.google.android.youtube")
-                                    TileId.IVI -> if (!launcher.launchFirstInstalled(*IVI_PACKAGES)) {
-                                        AppLog.w("NAV", "ИВИ не найден: ${IVI_PACKAGES.joinToString()}")
+                // ONE map for the whole process, painted here — below the NavHost — instead of inside the
+                // home destination. Leaving the carousel used to destroy the MapView and returning built a
+                // new GL context (dozens per drive); the first captured black screen landed half a second
+                // after such a rebuild. Every other screen paints an opaque background of its own, so the
+                // map is only ever seen through the home carousel's scrim.
+                Box(Modifier.fillMaxSize().background(LocalLauncherColors.current.background)) {
+                    MapBackground(Modifier.fillMaxSize())
+                    NavHost(nav, startDestination = "home") {
+                        composable("home") {
+                            // On the home carousel «Назад» is a no-op — we're already home and a HOME
+                            // launcher has nowhere to go back to. Without this, system BACK finishes the
+                            // Activity and reveals whatever task is behind us (e.g. Yandex, left by the
+                            // Music cold-start) → the user gets bounced out instead of staying home.
+                            BackHandler {}
+                            // Live outside temperature from the shared I-Bus reader → status bar.
+                            val ibus = remember { IBusService.get(applicationContext) }
+                            val bord by ibus.data.collectAsState()
+                            HomeCarousel(
+                                now = nowDateTime,
+                                temp = bord.outsideC?.let { "$it°" },
+                                onTile = { id ->
+                                    AppLog.d("NAV", "tile tapped: $id")
+                                    when (id) {
+                                        TileId.MUSIC -> nav.navigate("music")
+                                        TileId.APPS -> nav.navigate("apps")
+                                        TileId.SETTINGS -> nav.navigate("settings")
+                                        TileId.NAV -> launcher.launch(settings.navPackage)
+                                        TileId.IBUS -> nav.navigate("bordcomputer")
+                                        TileId.CARPLAY -> launcher.launch(settings.carplayPackage)
+                                        TileId.YOUTUBE -> launcher.launch("com.google.android.youtube")
+                                        TileId.IVI -> if (!launcher.launchFirstInstalled(*IVI_PACKAGES)) {
+                                            AppLog.w("NAV", "ИВИ не найден: ${IVI_PACKAGES.joinToString()}")
+                                        }
                                     }
-                                }
-                            },
-                        )
-                    }
-                    composable("bordcomputer") {
-                        BordComputerScreen(onBack = { nav.popBackStack() })
-                    }
-                    composable("apps") {
-                        AppsScreen(
-                            apps = InstalledApps(applicationContext).list(),
-                            onLaunch = { launcher.launch(it) },
-                            onRebootHold = { rebootDevice() },
-                            onBack = { nav.popBackStack() },
-                        )
-                    }
-                    composable("settings") {
-                        val update by updateState
-                        val hasRoot by hasRootState
-                        val isDefault by isDefaultLauncherState
-                        val logSend by logState
-                        // Same process-wide reader the home screen uses; mirror commands need its port.
-                        val ibus = remember { IBusService.get(applicationContext) }
-                        val ibusData by ibus.data.collectAsState()
-                        val busCapturing by ibus.busCapturing.collectAsState()
-                        val busFrames by ibus.busFrames.collectAsState()
-                        SettingsScreen(
-                            settings = settings,
-                            onAutostart = { lifecycleScope.launch { store.setAutostartIBus(it) } },
-                            onBringToFront = { lifecycleScope.launch { store.setBringToFront(it) } },
-                            onThemeMode = { lifecycleScope.launch { store.setThemeMode(it) } },
-                            currentVersion = BuildConfig.VERSION_NAME,
-                            hasRoot = hasRoot,
-                            updateState = update,
-                            onCheckUpdate = { onCheckUpdate() },
-                            onInstallUpdate = { onInstallUpdate() },
-                            isDefaultLauncher = isDefault,
-                            onSetDefault = { requestDefaultLauncher() },
-                            logState = logSend,
-                            onSendLogs = { onSendLogs() },
-                            ibusConnected = ibusData.connected,
-                            busCapturing = busCapturing,
-                            busFrames = busFrames,
-                            onToggleBusCapture = { ibus.setBusCapture(!busCapturing) },
-                            onOpenProbe = { nav.navigate("busprobe") },
-                            onMirrorAutoFold = { lifecycleScope.launch { store.setMirrorAutoFold(it) } },
-                            onBack = { nav.popBackStack() },
-                        )
-                    }
-                    composable("busprobe") {
-                        val ibus = remember { IBusService.get(applicationContext) }
-                        val d by ibus.data.collectAsState()
-                        BusProbeScreen(
-                            connected = d.connected,
-                            keyPosition = d.keyPosition,
-                            keyRaw = d.keyRaw,
-                            onSend = { ibus.sendProbe(it.frame, it.label) },
-                            onBack = { nav.popBackStack() },
-                        )
-                    }
-                    composable("music") {
-                        val musicState by musicVm.state.collectAsState()
-                        val coldStart by musicVm.coldStart.collectAsState()
-                        DisposableEffect(Unit) {
-                            musicVm.start(lifecycleScope) { launchYandexAndReturn(it) }
-                            onDispose { musicVm.stop() }
+                                },
+                            )
                         }
-                        MusicScreen(
-                            state = musicState,
-                            coldStart = coldStart,
-                            albumArt = musicVm.albumArt()?.asImageBitmap(),
-                            onPlayPause = { musicVm.playPause() },
-                            onNext = { musicVm.next() },
-                            onPrev = { musicVm.prev() },
-                            onSeek = { musicVm.seekTo(it) },
-                            onLike = { musicVm.like() },
-                            onSource = {
-                                // Tapping the source badge (v4) opens Yandex Music; also the
-                                // "grant permission" tap target when notification access is missing.
-                                if (!NotificationAccess.isGranted(applicationContext)) {
-                                    startActivity(NotificationAccess.settingsIntent())
-                                } else {
-                                    launcher.launch("ru.yandex.music")
-                                }
-                            },
-                            onShuffle = { musicVm.toggleShuffle() },
-                            onColdStartPlay = {
-                                // Explicit "Включить музыку": open Yandex foreground so «Моя волна»
-                                // auto-plays (the only reliable way from a fully-killed app), then
-                                // our now-playing fills in and we return to it.
-                                musicVm.launchForeground(lifecycleScope)
-                            },
-                            onBack = { nav.popBackStack() },
-                        )
+                        composable("bordcomputer") {
+                            BordComputerScreen(onBack = { nav.popBackStack() })
+                        }
+                        composable("apps") {
+                            AppsScreen(
+                                apps = InstalledApps(applicationContext).list(),
+                                onLaunch = { launcher.launch(it) },
+                                onRebootHold = { rebootDevice() },
+                                onBack = { nav.popBackStack() },
+                            )
+                        }
+                        composable("settings") {
+                            val update by updateState
+                            val hasRoot by hasRootState
+                            val isDefault by isDefaultLauncherState
+                            val logSend by logState
+                            // Same process-wide reader the home screen uses; mirror commands need its port.
+                            val ibus = remember { IBusService.get(applicationContext) }
+                            val ibusData by ibus.data.collectAsState()
+                            val busCapturing by ibus.busCapturing.collectAsState()
+                            val busFrames by ibus.busFrames.collectAsState()
+                            SettingsScreen(
+                                settings = settings,
+                                onAutostart = { lifecycleScope.launch { store.setAutostartIBus(it) } },
+                                onBringToFront = { lifecycleScope.launch { store.setBringToFront(it) } },
+                                onThemeMode = { lifecycleScope.launch { store.setThemeMode(it) } },
+                                currentVersion = BuildConfig.VERSION_NAME,
+                                hasRoot = hasRoot,
+                                updateState = update,
+                                onCheckUpdate = { onCheckUpdate() },
+                                onInstallUpdate = { onInstallUpdate() },
+                                isDefaultLauncher = isDefault,
+                                onSetDefault = { requestDefaultLauncher() },
+                                logState = logSend,
+                                onSendLogs = { onSendLogs() },
+                                ibusConnected = ibusData.connected,
+                                busCapturing = busCapturing,
+                                busFrames = busFrames,
+                                onToggleBusCapture = { ibus.setBusCapture(!busCapturing) },
+                                onOpenProbe = { nav.navigate("busprobe") },
+                                onMirrorAutoFold = { lifecycleScope.launch { store.setMirrorAutoFold(it) } },
+                                onBack = { nav.popBackStack() },
+                            )
+                        }
+                        composable("busprobe") {
+                            val ibus = remember { IBusService.get(applicationContext) }
+                            val d by ibus.data.collectAsState()
+                            BusProbeScreen(
+                                connected = d.connected,
+                                keyPosition = d.keyPosition,
+                                keyRaw = d.keyRaw,
+                                onSend = { ibus.sendProbe(it.frame, it.label) },
+                                onBack = { nav.popBackStack() },
+                            )
+                        }
+                        composable("music") {
+                            val musicState by musicVm.state.collectAsState()
+                            val coldStart by musicVm.coldStart.collectAsState()
+                            DisposableEffect(Unit) {
+                                musicVm.start(lifecycleScope) { launchYandexAndReturn(it) }
+                                onDispose { musicVm.stop() }
+                            }
+                            MusicScreen(
+                                state = musicState,
+                                coldStart = coldStart,
+                                albumArt = musicVm.albumArt()?.asImageBitmap(),
+                                onPlayPause = { musicVm.playPause() },
+                                onNext = { musicVm.next() },
+                                onPrev = { musicVm.prev() },
+                                onSeek = { musicVm.seekTo(it) },
+                                onLike = { musicVm.like() },
+                                onSource = {
+                                    // Tapping the source badge (v4) opens Yandex Music; also the
+                                    // "grant permission" tap target when notification access is missing.
+                                    if (!NotificationAccess.isGranted(applicationContext)) {
+                                        startActivity(NotificationAccess.settingsIntent())
+                                    } else {
+                                        launcher.launch("ru.yandex.music")
+                                    }
+                                },
+                                onShuffle = { musicVm.toggleShuffle() },
+                                onColdStartPlay = {
+                                    // Explicit "Включить музыку": open Yandex foreground so «Моя волна»
+                                    // auto-plays (the only reliable way from a fully-killed app), then
+                                    // our now-playing fills in and we return to it.
+                                    musicVm.launchForeground(lifecycleScope)
+                                },
+                                onBack = { nav.popBackStack() },
+                            )
+                        }
                     }
                 }
             }

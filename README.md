@@ -256,6 +256,7 @@ The app self-updates so improvements ship without a flash drive:
 
 | Version | Highlights |
 |---|---|
+| **1.6.39** | **One map for the whole process** — the MapLibre view moved out of the home destination and under the NavHost, so leaving the carousel no longer destroys its GL context and returning no longer builds a new one (it used to happen dozens of times per drive, and the first captured black screen landed right after such a rebuild). Screenshot goldens made honest again: the Settings one was missing two rows, and the Music ones rendered a live clock, so they could never verify |
 | **1.6.38** | **Black screen heals itself** — the detector now escalates through drop-the-map → recreate the activity → restart the process, and records which step brought the pixels back; its report gained a logcat tail, a GPU-bypassing software draw of the same window, a frame counter and the map's GL-context churn, so one occurrence is enough to name the broken layer |
 | **1.6.32–1.6.37** | **Real mirror fold codes** (0x39/0x3A — the earlier guess drove the *windows*), folding tied to the ignition rather than the door lock, a **bus probe** screen for trying telegrams safely, and an **ivi** tile beside YouTube |
 | **1.6.31** | **Durable black-screen detector** — samples the window's own pixels, so the blank-window-with-a-live-main-thread failure finally leaves evidence even when the car is offline |
