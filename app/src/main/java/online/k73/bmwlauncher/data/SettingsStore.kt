@@ -24,6 +24,7 @@ class SettingsStore(private val context: Context) {
         val ibusPkg = stringPreferencesKey("ibus_pkg")
         val carplayPkg = stringPreferencesKey("carplay_pkg")
         val mirrorAutoFold = booleanPreferencesKey("mirror_auto_fold")
+        val remoteAccess = booleanPreferencesKey("remote_access")
         val nightStart = intPreferencesKey("night_start")
         val nightEnd = intPreferencesKey("night_end")
     }
@@ -39,6 +40,8 @@ class SettingsStore(private val context: Context) {
     suspend fun setBringToFront(enabled: Boolean) =
         edit { it[Keys.bringToFront] = enabled }
     suspend fun setMirrorAutoFold(enabled: Boolean) = edit { it[Keys.mirrorAutoFold] = enabled }
+
+    suspend fun setRemoteAccess(enabled: Boolean) = edit { it[Keys.remoteAccess] = enabled }
 
     suspend fun setMusicPackage(pkg: String) = edit { it[Keys.musicPkg] = pkg }
     suspend fun setNavPackage(pkg: String) = edit { it[Keys.navPkg] = pkg }
@@ -65,6 +68,7 @@ class SettingsStore(private val context: Context) {
             iBusPackage = this[Keys.ibusPkg] ?: defaults.iBusPackage,
             carplayPackage = this[Keys.carplayPkg] ?: defaults.carplayPackage,
             mirrorAutoFold = this[Keys.mirrorAutoFold] ?: defaults.mirrorAutoFold,
+            remoteAccess = this[Keys.remoteAccess] ?: defaults.remoteAccess,
             nightStartHour = this[Keys.nightStart] ?: defaults.nightStartHour,
             nightEndHour = this[Keys.nightEnd] ?: defaults.nightEndHour,
         )

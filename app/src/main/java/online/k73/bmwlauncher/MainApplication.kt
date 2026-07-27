@@ -13,6 +13,7 @@ import online.k73.bmwlauncher.diag.AppLog
 import online.k73.bmwlauncher.diag.BlackScreenWatchdog
 import online.k73.bmwlauncher.diag.CrashHandler
 import online.k73.bmwlauncher.diag.LogUploader
+import online.k73.bmwlauncher.remote.RemoteTunnelService
 import java.io.File
 
 class MainApplication : Application() {
@@ -49,6 +50,13 @@ class MainApplication : Application() {
                 runCatching {
                     SettingsStore(this@MainApplication).flow.collect { s ->
                         IBusService.get(this@MainApplication).mirrorAutoEnabled = s.mirrorAutoFold
+                        // The tunnel follows the switch: the same collector already runs for the
+                        // mirrors, and starting a foreground service is idempotent.
+                        if (s.remoteAccess) {
+                            RemoteTunnelService.start(this@MainApplication)
+                        } else {
+                            RemoteTunnelService.stop(this@MainApplication)
+                        }
                     }
                 }
             }

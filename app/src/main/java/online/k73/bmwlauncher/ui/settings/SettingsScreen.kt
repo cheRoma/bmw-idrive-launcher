@@ -66,6 +66,9 @@ fun SettingsScreen(
     /** True when SFA (sing-box) is on the unit — without it there is nothing to hand the profile to. */
     vpnAppInstalled: Boolean = false,
     onSendVpnProfile: () -> Unit = {},
+    /** Live text from the tunnel itself — this row is how a failure becomes visible without me. */
+    remoteStatus: String = "",
+    onRemoteAccess: (Boolean) -> Unit = {},
     onBack: () -> Unit,
 ) {
     val c = LocalLauncherColors.current
@@ -139,6 +142,17 @@ fun SettingsScreen(
             subtitle = "Ручная отправка телеграмм в I-Bus — осторожно (окна/замки)",
         ) {
             AmberPill("Открыть", onClick = onOpenProbe, enabled = ibusConnected)
+        }
+        RowDivider()
+        SettingRow(
+            title = "Удалённый доступ",
+            subtitle = if (remoteStatus.isBlank()) {
+                "Туннель к серверу для удалённой поддержки"
+            } else {
+                "Туннель к серверу · $remoteStatus"
+            },
+        ) {
+            AmberSwitch(settings.remoteAccess, onRemoteAccess)
         }
         RowDivider()
         SettingRow(

@@ -15,6 +15,9 @@ data class LauncherSettings(
     // Mirrors fold when the key goes off, unfold on ignition. Off by default: it must not start
     // driving motors before the manual buttons have been tried in the car.
     val mirrorAutoFold: Boolean = false,
+    // The launcher's own reverse tunnel to the VPS. On by default: it is the only way to reach the
+    // car without asking the driver to tap through menus, which is the problem it was built for.
+    val remoteAccess: Boolean = true,
     val nightStartHour: Int = 20,
     val nightEndHour: Int = 7,
 )

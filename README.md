@@ -108,6 +108,13 @@ This started as a from-scratch replacement whose main job was to **autostart a p
 - Reports are **written to disk first and uploaded second**, because the interesting failures happen where there may be no network and the driver may just switch the ignition off. Each report carries device state, an event log, a logcat tail and a thread dump.
 - The black-screen detector doesn't only report — it **repairs, one step at a time** (drop the map → recreate the activity → restart the process), waits to see whether each step worked, and records the one that brought the pixels back. That answer is what tells us which layer broke.
 
+### Remote support tunnel
+- The launcher can hold its own **reverse SSH tunnel** to the owner's server, so the car can be diagnosed and fixed without the driver tapping through menus in a parked car. It replaces an `autossh` session that used to live in Termux on the head unit and died with every low-memory kill.
+- It carries back two loopback ports: the device's **adb** port, and a **small control endpoint inside the launcher** whose whole surface is four actions — status, upload diagnostics, re-hand the VPN profile, restart the launcher. There is no shell and no arbitrary command.
+- The endpoint listens on loopback only, is token-checked, and the server account is `nologin` with a key that may bind those two ports and nothing else — verified against the live server, including that a shell, an unlisted port and a local forward are all refused.
+- A switch in Settings turns it off, and the row shows the live connection state (that line is the only way to tell a tunnel failure apart from a car with no network).
+- **The credentials live in `keystore.properties`, never in the repository**, and the APK attached to public releases is built with `-PpublicBuild=true`, which blanks them: same code, remote access inert. A private key is only as private as the APK carrying it.
+
 ### Apps drawer
 - A grid of installed apps (real launcher icons from `PackageManager`) plus a dedicated, cordoned-off **Reboot** tile (tap-to-confirm).
 
@@ -238,6 +245,7 @@ export ANDROID_SDK_ROOT=/path/to/android-sdk
 
 - `applicationId` = `online.k73.bmwlauncher` · `minSdk` 26 · `targetSdk` 33 · `compileSdk` 34.
 - **Release signing** reads `keystore.properties` (gitignored) — create your own keystore; the app is unsigned-debug out of the box.
+- **Credentials** (log-upload token, VPN profile URL, remote-tunnel key) come from the same file. Build with `-PpublicBuild=true` to blank all of them — that is how the APK attached to public releases is produced.
 
 Install on the head unit over ADB (or via the in-app updater):
 
@@ -279,6 +287,7 @@ The app self-updates so improvements ship without a flash drive:
 
 | Version | Highlights |
 |---|---|
+| **1.6.41** | **The launcher carries its own reverse tunnel** — remote support no longer depends on Termux holding an `autossh` session that the low-memory killer took down. It exposes the device's adb port and a four-action control endpoint of the launcher's own, both loopback-only and reachable solely through the tunnel; a Settings switch turns it off and shows the live state. Public release APKs are built without the credentials |
 | **1.6.40** | **VPN profile handed over from Settings** — a «Передать» button fires sing-box's own `sing-box://import-remote-profile` link at SFA with the remote profile URL already filled in, so switching VPN servers no longer means typing a long address on the head unit's on-screen keyboard. The profile is remote, so later server changes need no visit to the car at all |
 | **1.6.39** | **One map for the whole process** — the MapLibre view moved out of the home destination and under the NavHost, so leaving the carousel no longer destroys its GL context and returning no longer builds a new one (it used to happen dozens of times per drive, and the first captured black screen landed right after such a rebuild). Screenshot goldens made honest again: the Settings one was missing two rows, and the Music ones rendered a live clock, so they could never verify |
 | **1.6.38** | **Black screen heals itself** — the detector now escalates through drop-the-map → recreate the activity → restart the process, and records which step brought the pixels back; its report gained a logcat tail, a GPU-bypassing software draw of the same window, a frame counter and the map's GL-context churn, so one occurrence is enough to name the broken layer |

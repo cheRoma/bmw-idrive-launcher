@@ -11,6 +11,13 @@ val keystoreProps = Properties().apply {
     if (f.exists()) load(f.inputStream())
 }
 
+// `-PpublicBuild=true` blanks every credential baked into the app. A private key is only as private
+// as the APK it ships in, and release APKs are attached to public GitHub releases — so the copy that
+// goes there is built this way: identical code, no secrets, remote access simply inert.
+val publicBuild = (project.findProperty("publicBuild") as String?)?.toBoolean() ?: false
+
+fun secret(name: String): String = if (publicBuild) "" else keystoreProps.getProperty(name) ?: ""
+
 android {
     namespace = "online.k73.bmwlauncher"
     compileSdk = 34
@@ -19,15 +26,27 @@ android {
         applicationId = "online.k73.bmwlauncher"
         minSdk = 26
         targetSdk = 33
-        versionCode = 68
-        versionName = "1.6.40"
+        versionCode = 69
+        versionName = "1.6.41"
 
         // Diagnostic log upload endpoint (token kept out of VCS via keystore.properties).
         buildConfigField("String", "LOG_UPLOAD_URL", "\"https://k73.online/newBMW/logs/upload\"")
-        buildConfigField("String", "LOG_UPLOAD_TOKEN", "\"${keystoreProps.getProperty("logUploadToken") ?: ""}\"")
+        buildConfigField("String", "LOG_UPLOAD_TOKEN", "\"${secret("logUploadToken")}\"")
         // Remote sing-box profile for the YouTube VPN. The URL's path IS the credential (anyone
         // holding it can use the tunnel), so it lives in keystore.properties, not in VCS.
-        buildConfigField("String", "VPN_PROFILE_URL", "\"${keystoreProps.getProperty("vpnProfileUrl") ?: ""}\"")
+        buildConfigField("String", "VPN_PROFILE_URL", "\"${secret("vpnProfileUrl")}\"")
+        // Reverse tunnel to the VPS: the launcher's own remote access, replacing the Termux autossh
+        // the head unit used to depend on. All of it is credentials, so it comes from
+        // keystore.properties and disappears in a public build.
+        buildConfigField("String", "TUNNEL_HOST", "\"72.56.92.199\"")
+        buildConfigField("int", "TUNNEL_PORT", "22")
+        buildConfigField("String", "TUNNEL_USER", "\"hu\"")
+        buildConfigField("String", "TUNNEL_KEY_B64", "\"${secret("tunnelKeyB64")}\"")
+        buildConfigField("String", "TUNNEL_KNOWN_HOST", "\"${secret("tunnelKnownHost")}\"")
+        buildConfigField("String", "CONTROL_TOKEN", "\"${secret("controlToken")}\"")
+        // Ports on the VPS side; both are pinned in the key's authorized_keys (permitlisten).
+        buildConfigField("int", "REMOTE_ADB_PORT", "20055")
+        buildConfigField("int", "REMOTE_CONTROL_PORT", "20080")
         // Yandex MapKit key for the live map background (kept out of VCS via keystore.properties).
         buildConfigField("String", "YANDEX_MAPKIT_KEY", "\"${keystoreProps.getProperty("yandexMapkitKey") ?: ""}\"")
     }
@@ -87,6 +106,8 @@ dependencies {
     implementation("com.github.mik3y:usb-serial-for-android:3.8.1")
     // MediaBrowserCompat — connect to Yandex's MediaBrowserService to start playback WITHOUT its UI
     implementation("androidx.media:media:1.7.0")
+    // SSH client for the launcher's own reverse tunnel (maintained JSch fork).
+    implementation("com.github.mwiede:jsch:0.2.25")
     debugImplementation(libs.compose.tooling)
 
     testImplementation(libs.junit)

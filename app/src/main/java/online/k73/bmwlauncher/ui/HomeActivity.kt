@@ -65,6 +65,7 @@ import androidx.compose.ui.Modifier
 import online.k73.bmwlauncher.ui.probe.BusProbeScreen
 import online.k73.bmwlauncher.ui.settings.SettingsScreen
 import online.k73.bmwlauncher.ui.theme.BmwLauncherTheme
+import online.k73.bmwlauncher.remote.RemoteStatus
 import online.k73.bmwlauncher.vpn.VpnProfile
 import java.time.LocalTime
 
@@ -373,6 +374,7 @@ class HomeActivity : ComponentActivity() {
             val isNight = ThemeResolver.isNight(settings.themeMode, now, settings.nightStartHour, settings.nightEndHour)
             BmwLauncherTheme(isNight = isNight) {
                 val nav = rememberNavController()
+                val remoteStatus by RemoteStatus.state.collectAsState()
                 // Every screen change in the event log. Tile taps were already logged, but returns
                 // («Назад», the panel key, popBackStack) were not — and it is the return to the home
                 // carousel that rebuilds the map's GL context, so a black-screen report without this
@@ -475,6 +477,8 @@ class HomeActivity : ComponentActivity() {
                                 onMirrorAutoFold = { lifecycleScope.launch { store.setMirrorAutoFold(it) } },
                                 vpnAppInstalled = launcher.isInstalled(VpnProfile.SFA_PACKAGE),
                                 onSendVpnProfile = { sendVpnProfile() },
+                                remoteStatus = remoteStatus,
+                                onRemoteAccess = { lifecycleScope.launch { store.setRemoteAccess(it) } },
                                 onBack = { nav.popBackStack() },
                             )
                         }

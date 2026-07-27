@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Brief wake lock so an ignition-off mirror fold can finish sending before the head unit sleeps. -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- The reverse tunnel must survive being backgrounded while YouTube or Yandex is in front. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
     <uses-permission android:name="android.permission.INTERNET" />
@@ -82,5 +84,11 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/button_redirect_service" />
         </service>
+
+        <!-- Launcher's own reverse SSH tunnel + loopback control endpoint (see remote/). -->
+        <service
+            android:name=".remote.RemoteTunnelService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 </manifest>
