@@ -65,6 +65,7 @@ import androidx.compose.ui.Modifier
 import online.k73.bmwlauncher.ui.probe.BusProbeScreen
 import online.k73.bmwlauncher.ui.settings.SettingsScreen
 import online.k73.bmwlauncher.ui.theme.BmwLauncherTheme
+import online.k73.bmwlauncher.vpn.VpnProfile
 import java.time.LocalTime
 
 class HomeActivity : ComponentActivity() {
@@ -130,6 +131,35 @@ class HomeActivity : ComponentActivity() {
                 requestPermissions(arrayOf(perm, android.Manifest.permission.ACCESS_COARSE_LOCATION), 0)
             }
         }
+    }
+
+    /**
+     * Hand the YouTube VPN profile to SFA through sing-box's own import scheme — typing a long URL on
+     * this unit's on-screen keyboard is the worst part of changing VPN servers. The profile is remote,
+     * so this is a one-time handover: later server changes are picked up by SFA itself.
+     *
+     * The URL's path is the credential, so it never reaches the log. All guarded — this is HOME.
+     */
+    private fun sendVpnProfile() {
+        val url = BuildConfig.VPN_PROFILE_URL
+        if (url.isBlank()) {
+            AppLog.w("VPN", "профиль не зашит в сборку")
+            return
+        }
+        val uri = Uri.parse(VpnProfile.importLink(url))
+        // Pinned to SFA first; if the ROM refuses an explicit package for a custom scheme, let the
+        // system resolve it (SFA is the only app registering sing-box://).
+        val pinned = Intent(Intent.ACTION_VIEW, uri)
+            .setPackage(VpnProfile.SFA_PACKAGE)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (runCatching { startActivity(pinned) }.isSuccess) {
+            AppLog.d("VPN", "профиль передан в SFA")
+            return
+        }
+        val open = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { startActivity(open) }
+            .onSuccess { AppLog.d("VPN", "профиль передан через системный выбор") }
+            .onFailure { AppLog.w("VPN", "SFA не принял ссылку: ${it.message}") }
     }
 
     private fun requestDefaultLauncher() {
@@ -443,6 +473,8 @@ class HomeActivity : ComponentActivity() {
                                 onToggleBusCapture = { ibus.setBusCapture(!busCapturing) },
                                 onOpenProbe = { nav.navigate("busprobe") },
                                 onMirrorAutoFold = { lifecycleScope.launch { store.setMirrorAutoFold(it) } },
+                                vpnAppInstalled = launcher.isInstalled(VpnProfile.SFA_PACKAGE),
+                                onSendVpnProfile = { sendVpnProfile() },
                                 onBack = { nav.popBackStack() },
                             )
                         }

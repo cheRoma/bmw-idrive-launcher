@@ -19,12 +19,15 @@ android {
         applicationId = "online.k73.bmwlauncher"
         minSdk = 26
         targetSdk = 33
-        versionCode = 67
-        versionName = "1.6.39"
+        versionCode = 68
+        versionName = "1.6.40"
 
         // Diagnostic log upload endpoint (token kept out of VCS via keystore.properties).
         buildConfigField("String", "LOG_UPLOAD_URL", "\"https://k73.online/newBMW/logs/upload\"")
         buildConfigField("String", "LOG_UPLOAD_TOKEN", "\"${keystoreProps.getProperty("logUploadToken") ?: ""}\"")
+        // Remote sing-box profile for the YouTube VPN. The URL's path IS the credential (anyone
+        // holding it can use the tunnel), so it lives in keystore.properties, not in VCS.
+        buildConfigField("String", "VPN_PROFILE_URL", "\"${keystoreProps.getProperty("vpnProfileUrl") ?: ""}\"")
         // Yandex MapKit key for the live map background (kept out of VCS via keystore.properties).
         buildConfigField("String", "YANDEX_MAPKIT_KEY", "\"${keystoreProps.getProperty("yandexMapkitKey") ?: ""}\"")
     }

@@ -63,6 +63,9 @@ fun SettingsScreen(
     onToggleBusCapture: () -> Unit = {},
     onOpenProbe: () -> Unit = {},
     onMirrorAutoFold: (Boolean) -> Unit = {},
+    /** True when SFA (sing-box) is on the unit — without it there is nothing to hand the profile to. */
+    vpnAppInstalled: Boolean = false,
+    onSendVpnProfile: () -> Unit = {},
     onBack: () -> Unit,
 ) {
     val c = LocalLauncherColors.current
@@ -136,6 +139,17 @@ fun SettingsScreen(
             subtitle = "Ручная отправка телеграмм в I-Bus — осторожно (окна/замки)",
         ) {
             AmberPill("Открыть", onClick = onOpenProbe, enabled = ibusConnected)
+        }
+        RowDivider()
+        SettingRow(
+            title = "VPN для YouTube",
+            subtitle = if (vpnAppInstalled) {
+                "Передать профиль в sing-box — останется подтвердить импорт"
+            } else {
+                "Приложение sing-box (SFA) не найдено на устройстве"
+            },
+        ) {
+            AmberPill("Передать", onClick = onSendVpnProfile, enabled = vpnAppInstalled)
         }
         RowDivider()
         UpdateRow(currentVersion, hasRoot, updateState, onCheckUpdate, onInstallUpdate)
