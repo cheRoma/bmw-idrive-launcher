@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
 import online.k73.bmwlauncher.autostart.AutostartController
+import online.k73.bmwlauncher.autostart.LauncherForeground
 import online.k73.bmwlauncher.data.LauncherSettings
 import online.k73.bmwlauncher.data.SettingsStore
 import online.k73.bmwlauncher.diag.AppLog
@@ -475,6 +476,7 @@ class HomeActivity : ComponentActivity() {
                                 onToggleBusCapture = { ibus.setBusCapture(!busCapturing) },
                                 onOpenProbe = { nav.navigate("busprobe") },
                                 onMirrorAutoFold = { lifecycleScope.launch { store.setMirrorAutoFold(it) } },
+                                onHomeOnIgnition = { lifecycleScope.launch { store.setHomeOnIgnition(it) } },
                                 vpnAppInstalled = launcher.isInstalled(VpnProfile.SFA_PACKAGE),
                                 onSendVpnProfile = { sendVpnProfile() },
                                 remoteStatus = remoteStatus,
@@ -536,10 +538,18 @@ class HomeActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Whether the driver is looking at us right now. Read by BringHome, so that starting the car
+        // while the launcher is already on screen does not stage a pointless jump to Home.
+        LauncherForeground.isResumed = true
         // Refresh default-launcher status every resume (e.g. after returning from the system dialog).
         // Must run before the autostart early-return so it always updates.
         isDefaultLauncherState.value = computeIsDefaultLauncher()
         // i-Bus autostart REMOVED: we now read the I-Bus ourselves (our own «Борткомпьютер») and USB
         // is single-owner — launching the OEM app would steal the adapter. The tile opens our screen.
+    }
+
+    override fun onPause() {
+        LauncherForeground.isResumed = false
+        super.onPause()
     }
 }

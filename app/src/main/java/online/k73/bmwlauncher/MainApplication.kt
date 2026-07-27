@@ -50,6 +50,7 @@ class MainApplication : Application() {
                 runCatching {
                     SettingsStore(this@MainApplication).flow.collect { s ->
                         IBusService.get(this@MainApplication).mirrorAutoEnabled = s.mirrorAutoFold
+                        IBusService.get(this@MainApplication).homeOnIgnition = s.homeOnIgnition
                         // The tunnel follows the switch: the same collector already runs for the
                         // mirrors, and starting a foreground service is idempotent.
                         if (s.remoteAccess) {

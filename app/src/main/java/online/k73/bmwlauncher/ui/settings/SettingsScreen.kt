@@ -63,6 +63,7 @@ fun SettingsScreen(
     onToggleBusCapture: () -> Unit = {},
     onOpenProbe: () -> Unit = {},
     onMirrorAutoFold: (Boolean) -> Unit = {},
+    onHomeOnIgnition: (Boolean) -> Unit = {},
     /** True when SFA (sing-box) is on the unit — without it there is nothing to hand the profile to. */
     vpnAppInstalled: Boolean = false,
     onSendVpnProfile: () -> Unit = {},
@@ -128,6 +129,13 @@ fun SettingsScreen(
                 onClick = onToggleBusCapture,
                 enabled = ibusConnected || busCapturing,   // «Стоп» must always be tappable while recording
             )
+        }
+        RowDivider()
+        SettingRow(
+            title = "Открывать лаунчер при заводе",
+            subtitle = "Иначе после сна голова возвращает то, что было открыто в прошлый раз",
+        ) {
+            AmberSwitch(settings.homeOnIgnition, onHomeOnIgnition)
         }
         RowDivider()
         SettingRow(

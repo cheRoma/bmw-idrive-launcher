@@ -50,5 +50,32 @@ class ButtonRedirectService : AccessibilityService() {
         }.onFailure { AppLog.w("BTNREDIR", "redirect failed: ${it.message}") }
     }
 
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        instance = this
+        AppLog.d("BTNREDIR", "служба доступности подключена")
+    }
+
+    override fun onDestroy() {
+        if (instance === this) instance = null
+        super.onDestroy()
+    }
+
     override fun onInterrupt() {}
+
+    companion object {
+        @Volatile
+        private var instance: ButtonRedirectService? = null
+
+        /**
+         * Press Home on behalf of the app. An accessibility service may do this from the background,
+         * which nothing else here can — see [online.k73.bmwlauncher.autostart.BringHome].
+         *
+         * @return true when the press was delivered.
+         */
+        fun pressHome(): Boolean {
+            val service = instance ?: return false
+            return runCatching { service.performGlobalAction(GLOBAL_ACTION_HOME) }.getOrDefault(false)
+        }
+    }
 }

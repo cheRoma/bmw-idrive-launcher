@@ -17,6 +17,9 @@ data class LauncherSettings(
     val mirrorAutoFold: Boolean = false,
     // The launcher's own reverse tunnel to the VPS. On by default: it is the only way to reach the
     // car without asking the driver to tap through menus, which is the problem it was built for.
+    // Starting the car should land on the launcher, not on whatever the unit restored from the last
+    // trip (YouTube, the navigator). On by default — it is what the driver expects.
+    val homeOnIgnition: Boolean = true,
     val remoteAccess: Boolean = true,
     val nightStartHour: Int = 20,
     val nightEndHour: Int = 7,

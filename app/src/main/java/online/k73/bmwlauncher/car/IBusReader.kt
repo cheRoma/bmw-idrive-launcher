@@ -14,6 +14,8 @@ import com.hoho.android.usbserial.driver.UsbSerialProber
 import com.hoho.android.usbserial.util.SerialInputOutputManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import online.k73.bmwlauncher.autostart.BringHome
+import online.k73.bmwlauncher.autostart.LauncherForeground
 import online.k73.bmwlauncher.diag.AppLog
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -41,6 +43,10 @@ class IBusReader(private val appContext: Context) {
     // when a launcher restart races for it. `stopped` gates all reconnect work after stop(); one
     // reconnect is coalesced via `reconnectPending`; `backoffMs` climbs 1→2→5 s and resets on a
     // healthy connect or a hotplug ATTACH.
+    /** Fed from the settings collector: open the launcher when the ignition comes on. */
+    @Volatile var homeOnIgnition: Boolean = true
+    private val ignitionHome = IgnitionHomePolicy()
+
     @Volatile private var stopped = false
     @Volatile private var reconnectPending = false
     @Volatile private var backoffMs = 0L
@@ -423,6 +429,14 @@ class IBusReader(private val appContext: Context) {
         }
         val prev = lastIgnitionOn
         lastIgnitionOn = ign
+        // Starting the car must land on the launcher, not on whatever the head unit restored from
+        // before it slept. Checked before the mirror gates below: the two features are independent.
+        if (homeOnIgnition &&
+            ignitionHome.shouldOpenHome(ign, prev, System.currentTimeMillis(), LauncherForeground.isResumed)
+        ) {
+            AppLog.d("HOME", "зажигание ВКЛ → вывожу лаунчер вперёд")
+            BringHome.afterIgnition(appContext)
+        }
         if (!MIRROR_COMMANDS_ENABLED || !mirrorAutoEnabled) return
         val action = when {
             ign && prev != true -> MirrorAction.UNFOLD    // engine on / just booted into ignition

@@ -45,12 +45,12 @@ fun MapBackground(modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // Numbered so the diagnostics show how many GL contexts this process has been through. Composed
-    // once by HomeActivity below the NavHost, this should stay at #1 for the whole drive; it used to
-    // climb by one on every return to the carousel.
-    val instance = remember { MapRuntime.nextInstance() }
-    val mapView = remember {
-        runCatching {
+    // The view and its teardown are remembered as ONE object, a RememberObserver: a value built
+    // inside `remember` may never reach the composition, and the discarded one would then keep its
+    // GL context forever (the car reported created=2 destroyed=0 — one context more than it ever
+    // showed). MapLifecycle closes it on either path, abandoned or forgotten.
+    val holder = remember {
+        val view = runCatching {
             MapLibre.getInstance(ctx)                 // no API key needed
             // TEXTURE mode (not the default SurfaceView): renders into a TextureView that composites
             // as an ordinary view in the hierarchy. The default GL SurfaceView owns a separate surface
@@ -60,10 +60,15 @@ fun MapBackground(modifier: Modifier = Modifier) {
             // background behind it, never a black window.
             val options = MapLibreMapOptions.createFromAttributes(ctx).textureMode(true)
             MapView(ctx, options).apply { onCreate(null) }
-        }.onSuccess { AppLog.d("MAP", "view#$instance created (texture)") }
-            .onFailure { AppLog.w("MAP", "view#$instance create failed: ${it.message}") }
-            .getOrNull()
-    } ?: return
+        }.getOrElse { error ->
+            AppLog.w("MAP", "не смог создать карту: ${error.message}")
+            null
+        }
+        MapLifecycle(view) { it.onStop(); it.onDestroy() }.also {
+            if (view != null) AppLog.d("MAP", "view#${it.instance} created (texture)")
+        }
+    }
+    val mapView = holder.value ?: return
 
     // Load our style, lock interaction, and follow the car's position.
     DisposableEffect(mapView) {
@@ -116,18 +121,14 @@ fun MapBackground(modifier: Modifier = Modifier) {
                     Lifecycle.Event.ON_RESUME -> mapView.onResume()
                     Lifecycle.Event.ON_PAUSE -> mapView.onPause()
                     Lifecycle.Event.ON_STOP -> mapView.onStop()
-                    Lifecycle.Event.ON_DESTROY -> mapView.onDestroy()
+                    // ON_DESTROY is deliberately not forwarded: destruction belongs to MapLifecycle,
+                    // which is the only path that also runs when the composition was abandoned.
                     else -> {}
                 }
             }
         }
         lifecycleOwner.lifecycle.addObserver(obs)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(obs)
-            runCatching { mapView.onStop(); mapView.onDestroy() }
-            MapRuntime.onDestroyed()
-            AppLog.d("MAP", "view#$instance destroyed")
-        }
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
     }
 
     AndroidView(factory = { mapView }, modifier = modifier)
