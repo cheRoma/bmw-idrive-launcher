@@ -318,11 +318,15 @@ The app self-updates so improvements ship without a flash drive:
 
 - **Trip computer** — fuel level and consumption, decoded from a real drive capture (average speed is done).
 - **An earlier parking alert** — the E53's own buzzer stays quiet until you are close; the distances are on the bus, so a graduated alert can start sooner.
-- In-launcher **playlist browsing** (Yandex `MediaBrowserService`, pending device probe).
 - Reflect the **real "liked" state** from the media session.
 - A distinct, brighter **Day theme** pass.
 
 *(Done since the roadmap was first written: live map background, our own I-Bus on-board computer, outside temperature in the ribbon, trip average speed, mirror automation, self-repairing diagnostics.)*
+
+**What will not happen:** in-launcher **playlist browsing**. Tested on the car: Yandex Music's
+`MusicBrowserService` rejects us as a third-party browse client (`onConnectionFailed`) — binding only
+wakes its process, the catalogue is never handed over. So "Плейлисты" stays a button that opens the
+Yandex app; transport control and now-playing over `MediaSession` work in full.
 
 ---
 
