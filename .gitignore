@@ -13,3 +13,6 @@ local.properties
 # Release signing (never commit)
 keystore.properties
 *.jks
+
+# Watchdog logs
+reports/
