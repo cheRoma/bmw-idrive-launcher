@@ -187,9 +187,15 @@ class HomeActivity : ComponentActivity() {
         const val EXTRA_NAV_ROUTE = "nav_route"
         val VALID_ROUTES = setOf("music", "apps", "settings", "bordcomputer", "busprobe")
 
-        // ИВИ ships as ru.ivi.client on phones and ru.ivi.client.tv on Android-TV builds; which one
-        // the head unit got is unverified (no tunnel yet), so the tile tries both.
+        // ИВИ ships as ru.ivi.client on phones and ru.ivi.client.tv on Android-TV builds; the head
+        // unit has the phone one (checked over adb 03.09.2026), but keep both so a reinstall from a
+        // TV-flavoured store does not silently dead-end the tile.
         val IVI_PACKAGES = arrayOf("ru.ivi.client", "ru.ivi.client.tv")
+
+        // Same two-flavour story for Кинопоиск. Installed and already signed in on the car
+        // (com.yandex.passport.kinopoisk account), so this tile is one tap to a working catalogue —
+        // as long as the unit is on its own SIM; see the region note in docs/kinopoisk.md.
+        val KINOPOISK_PACKAGES = arrayOf("ru.kinopoisk", "ru.kinopoisk.tv")
 
         // How long to let i-Bus initialize its I-Bus/USB link before we pull the launcher back to the
         // front. On non-root stock Android an activity launch is necessarily briefly visible; NO_ANIMATION
@@ -428,6 +434,10 @@ class HomeActivity : ComponentActivity() {
                                         TileId.IBUS -> nav.navigate("bordcomputer")
                                         TileId.CARPLAY -> launcher.launch(settings.carplayPackage)
                                         TileId.YOUTUBE -> launcher.launch("com.google.android.youtube")
+                                        TileId.KINOPOISK ->
+                                            if (!launcher.launchFirstInstalled(*KINOPOISK_PACKAGES)) {
+                                                AppLog.w("NAV", "Кинопоиск не найден: ${KINOPOISK_PACKAGES.joinToString()}")
+                                            }
                                         TileId.IVI -> if (!launcher.launchFirstInstalled(*IVI_PACKAGES)) {
                                             AppLog.w("NAV", "ИВИ не найден: ${IVI_PACKAGES.joinToString()}")
                                         }

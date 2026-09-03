@@ -15,6 +15,7 @@ import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.Navigation
 import androidx.compose.material.icons.outlined.SmartDisplay
 import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.material.icons.outlined.Theaters
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -29,6 +30,9 @@ val defaultTiles = listOf(
     Tile(TileId.SETTINGS, "Настройки", Icons.Outlined.Tune),
     Tile(TileId.CARPLAY, "CarPlay", Icons.Outlined.Cast),
     Tile(TileId.YOUTUBE, "YouTube", Icons.Outlined.SmartDisplay),
+    // Ahead of ИВИ on purpose: Кинопоиск rides the Плюс subscription the car already signs into for
+    // Яндекс.Музыка, and unlike YouTube it needs no tunnel — on the car's own SIM it just works.
+    Tile(TileId.KINOPOISK, "Кинопоиск", Icons.Outlined.Theaters),
     Tile(TileId.IVI, "ИВИ", Icons.Outlined.Movie),
 )
 
