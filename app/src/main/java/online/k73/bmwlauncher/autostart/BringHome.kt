@@ -24,7 +24,8 @@ object LauncherForeground {
  * 1. **the accessibility service**, which is allowed to act from the background and whose
  *    `GLOBAL_ACTION_HOME` is literally the Home button — the system then opens us, since we are the
  *    default HOME app;
- * 2. a direct activity start, for when that service isn't enabled.
+ * 2. a HOME intent, for when that service isn't enabled — see [homeIntent] for why it must be a HOME
+ *    intent and not a start of our own class.
  *
  * And it fires **twice**, spaced out: the ROM finishes restoring its own last app a beat after the
  * screen comes up, and a single early attempt would simply be covered by it.
@@ -49,15 +50,27 @@ object BringHome {
             AppLog.d("HOME", "$reason → «Домой» через службу доступности")
             return
         }
-        runCatching {
-            context.startActivity(
-                Intent(context, HomeActivity::class.java).addFlags(
-                    Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
-                        Intent.FLAG_ACTIVITY_NO_ANIMATION,
-                ),
-            )
-        }.onSuccess { AppLog.d("HOME", "$reason → вывел лаунчер напрямую") }
+        runCatching { context.startActivity(homeIntent(context.packageName)) }
+            .onSuccess { AppLog.d("HOME", "$reason → вывел лаунчер напрямую") }
             .onFailure { AppLog.w("HOME", "$reason → не удалось: ${it.message}") }
     }
+
+    /**
+     * The fallback asks the system for HOME instead of starting [HomeActivity] by class.
+     *
+     * Starting our own component with `NEW_TASK` builds a SECOND HomeActivity in a task of its own:
+     * the home stack keeps the instance the system launched, and ours lands beside it. Two live
+     * activities mean two live map views, and the car reported exactly that — `created=2 destroyed=0`
+     * in one process, with no `view#… destroyed` line in between. A HOME intent is placed in the home
+     * task, so an existing instance is reused (`onNewIntent`) instead of a new one being created.
+     * This also makes the fallback mean the same thing as path 1, which is literally the Home button.
+     *
+     * Pinned to our own package: without it, a moment when we are not the default HOME would open
+     * somebody else's launcher instead of ours.
+     */
+    fun homeIntent(packageName: String): Intent =
+        Intent(Intent.ACTION_MAIN)
+            .addCategory(Intent.CATEGORY_HOME)
+            .setPackage(packageName)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
 }
