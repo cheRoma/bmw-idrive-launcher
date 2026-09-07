@@ -18,6 +18,7 @@ Built for a **2005 BMW X5 (E53)** running an **XTRONS** Android head unit, this 
 - [Screenshots](#screenshots)
 - [Features](#features)
 - [The car & the head unit](#the-car--the-head-unit)
+- [Running it on other hardware](#running-it-on-other-hardware)
 - [Design system](#design-system)
 - [Architecture](#architecture)
 - [Project structure](#project-structure)
@@ -142,6 +143,38 @@ This started as a from-scratch replacement whose main job was to **autostart a p
 | **Car integration** | our own I-Bus reader over the Resler **CP210x USB→I-Bus** adapter |
 
 > **Design note:** everything is laid out in **dp** against the *measured* width, never a hardcoded one — an early bug centred the carousel off-screen because the layout math assumed 1280 dp. Screenshot tests deliberately render at 1280 px / mdpi (so `dp == px`) to pin the layout to the mockups.
+
+---
+
+## Running it on other hardware
+
+This launcher was written for one car and one head unit. Some of the code moves anywhere. Some of it holds onto the vendor ROM. Some has nothing to do with the head unit at all and belongs to the car instead.
+
+| Moves as-is | Holds onto this ROM | Holds onto the car |
+|---|---|---|
+| the UI: carousel, tiles, theme | reboot via the `com.microntek.hctreboot` broadcast | on-board computer |
+| map background (MapLibre, style by URL) | panel-button interception | mirror folding |
+| Music over `MediaSession` | ADB unlock with the `adbon` password | ignition detection |
+| apps drawer, Settings | black-screen watchdog | early parking-sensor alert |
+| OTA (needs your own server with `latest.json`) | | |
+
+The right-hand column is not about the head unit. All of it reads the BMW I-Bus over a CP210x USB adapter at 9600 8E1. Without a BMW of the right years and the physical adapter, that code is dead no matter which ROM you flash.
+
+The middle column has to be rewritten for your vendor. Units in this class often share an enclosure and a screen while differing in SoC and ROM underneath, so matching hardware on the outside tells you little about what is inside.
+
+### In an emulator, turn the black-screen watchdog off first
+
+Otherwise the app closes itself, which reads as a crash.
+
+Every 2.5 seconds the watchdog takes a 48×27 copy of the window and counts bright pixels. When almost none are left it treats the screen as gone black and escalates through repairs: drop the map, recreate the activity, restart the process. On an emulator `PixelCopy` regularly hands back a black frame, so the watchdog walks all the way to the last step.
+
+Telling it apart from a real crash is easy. There is no "app has stopped" dialog, and the log names the reason.
+
+```bash
+adb logcat -s BLACKSCREEN     # lines like «ремонт 1/3: убираю карту с главного экрана»
+```
+
+Comment out `BlackScreenWatchdog.start(...)` in `MainApplication.kt` to disable it. On the real head unit it is worth keeping: the launcher window there sometimes went black while the main thread stayed responsive, which a hang detector cannot see.
 
 ---
 
