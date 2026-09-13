@@ -430,7 +430,12 @@ class HomeActivity : ComponentActivity() {
                                         TileId.MUSIC -> nav.navigate("music")
                                         TileId.APPS -> nav.navigate("apps")
                                         TileId.SETTINGS -> nav.navigate("settings")
-                                        TileId.NAV -> launcher.launch(settings.navPackage)
+                                        // The package is switchable in Settings now, so it can point
+                                        // at an app that was never installed — say so instead of
+                                        // leaving a tile that swallows taps.
+                                        TileId.NAV -> if (!launcher.launch(settings.navPackage)) {
+                                            AppLog.w("NAV", "Навигатор не найден: ${settings.navPackage}")
+                                        }
                                         TileId.IBUS -> nav.navigate("bordcomputer")
                                         TileId.CARPLAY -> launcher.launch(settings.carplayPackage)
                                         TileId.YOUTUBE -> launcher.launch("com.google.android.youtube")
@@ -471,6 +476,7 @@ class HomeActivity : ComponentActivity() {
                                 onAutostart = { lifecycleScope.launch { store.setAutostartIBus(it) } },
                                 onBringToFront = { lifecycleScope.launch { store.setBringToFront(it) } },
                                 onThemeMode = { lifecycleScope.launch { store.setThemeMode(it) } },
+                                onNavPackage = { lifecycleScope.launch { store.setNavPackage(it) } },
                                 currentVersion = BuildConfig.VERSION_NAME,
                                 hasRoot = hasRoot,
                                 updateState = update,

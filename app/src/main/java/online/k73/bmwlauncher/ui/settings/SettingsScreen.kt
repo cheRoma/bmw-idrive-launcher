@@ -12,15 +12,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -32,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import online.k73.bmwlauncher.data.LauncherSettings
+import online.k73.bmwlauncher.data.NavApp
 import online.k73.bmwlauncher.data.ThemeMode
 import online.k73.bmwlauncher.diag.LogSendState
 import online.k73.bmwlauncher.ui.theme.Inter
@@ -47,6 +44,8 @@ fun SettingsScreen(
     onAutostart: (Boolean) -> Unit,
     onBringToFront: (Boolean) -> Unit,
     onThemeMode: (ThemeMode) -> Unit,
+    /** Package of the app behind the НАВИГАТОР tile — see [NavApp]. */
+    onNavPackage: (String) -> Unit = {},
     currentVersion: String,
     hasRoot: Boolean,
     updateState: UpdateUiState,
@@ -96,10 +95,10 @@ fun SettingsScreen(
         }
         RowDivider()
         SettingRow(
-            title = "Приложения по умолчанию",
-            subtitle = "Музыка · Яндекс Музыка — Навигация · Яндекс Навигатор",
+            title = "Навигатор",
+            subtitle = "Что открывает плитка НАВИГАТОР · Yango — те же карты Яндекса, но без рекламы",
         ) {
-            Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = c.textTertiary, modifier = Modifier.size(28.dp))
+            NavSegments(settings.navPackage, onNavPackage)
         }
         RowDivider()
         SettingRow(
@@ -237,14 +236,36 @@ private fun AmberSwitch(checked: Boolean, onChange: (Boolean) -> Unit, enabled: 
 }
 
 @Composable
-private fun ThemeSegments(selected: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
+private fun ThemeSegments(selected: ThemeMode, onThemeMode: (ThemeMode) -> Unit) =
+    Segments(
+        options = listOf(ThemeMode.DAY to "День", ThemeMode.NIGHT to "Ночь", ThemeMode.AUTO to "Авто"),
+        selected = selected,
+        onSelect = onThemeMode,
+    )
+
+/** An unknown package lights up «Яндекс», so the row never shows an empty selection. */
+@Composable
+private fun NavSegments(selectedPkg: String, onNavPackage: (String) -> Unit) =
+    Segments(
+        options = NavApp.entries.map { it to it.label },
+        selected = NavApp.of(selectedPkg),
+        onSelect = { onNavPackage(it.pkg) },
+    )
+
+/** Pill-shaped segmented control — the one selector shape this screen uses. */
+@Composable
+private fun <T> Segments(
+    options: List<Pair<T, String>>,
+    selected: T,
+    onSelect: (T) -> Unit,
+) {
     val c = LocalLauncherColors.current
     Row(
         Modifier.clip(RoundedCornerShape(12.dp)).background(c.surfaceHi).padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        listOf(ThemeMode.DAY to "День", ThemeMode.NIGHT to "Ночь", ThemeMode.AUTO to "Авто").forEach { (mode, label) ->
-            val active = selected == mode
+        options.forEach { (value, label) ->
+            val active = selected == value
             Box(
                 Modifier
                     .width(96.dp)
@@ -252,7 +273,7 @@ private fun ThemeSegments(selected: ThemeMode, onThemeMode: (ThemeMode) -> Unit)
                     .clip(RoundedCornerShape(9.dp))
                     .then(if (active) Modifier.background(c.accent.copy(alpha = 0.14f)) else Modifier)
                     .then(if (active) Modifier.border(1.dp, c.accent.copy(alpha = 0.5f), RoundedCornerShape(9.dp)) else Modifier)
-                    .pressScale { onThemeMode(mode) },
+                    .pressScale { onSelect(value) },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(

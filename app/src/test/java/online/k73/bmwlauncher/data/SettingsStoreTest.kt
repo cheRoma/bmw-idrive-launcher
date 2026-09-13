@@ -31,6 +31,13 @@ class SettingsStoreTest {
         assertEquals("de.example.ibus", store.read().iBusPackage)
     }
 
+    @Test fun persists_nav_package() = runTest {
+        store.setNavPackage(NavApp.YANGO.pkg)
+        assertEquals(NavApp.YANGO.pkg, store.read().navPackage)
+        store.setNavPackage(NavApp.YANDEX.pkg)
+        assertEquals(NavApp.YANDEX.pkg, store.read().navPackage)
+    }
+
     @Test fun falls_back_to_default_on_corrupt_theme_value() = runTest {
         // Write a bogus raw value under the same key SettingsStore reads, bypassing setThemeMode.
         store.editRaw { it[stringPreferencesKey("theme_mode")] = "PURPLE" }

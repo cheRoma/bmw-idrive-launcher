@@ -13,4 +13,15 @@ class LauncherSettingsTest {
         assertEquals("ru.yandex.yandexnavi", s.navPackage)
         assertEquals("com.zjinnova.zlink", s.carplayPackage)
     }
+
+    @Test fun nav_app_is_resolved_from_its_package() {
+        assertEquals(NavApp.YANDEX, NavApp.of("ru.yandex.yandexnavi"))
+        assertEquals(NavApp.YANGO, NavApp.of("com.yango.maps.android"))
+    }
+
+    @Test fun unknown_nav_package_falls_back_to_navigator() {
+        // A package set by hand over the tunnel must not leave the selector with nothing lit.
+        assertEquals(NavApp.YANDEX, NavApp.of("com.google.android.apps.maps"))
+        assertEquals(NavApp.YANDEX, NavApp.of(""))
+    }
 }
