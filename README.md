@@ -15,6 +15,7 @@ Built for a **2005 BMW X5 (E53)** running an **XTRONS** Android head unit, this 
 ## Table of contents
 
 - [Why](#why)
+- [Promo video](#promo-video)
 - [Screenshots](#screenshots)
 - [Features](#features)
 - [The car & the head unit](#the-car--the-head-unit)
@@ -47,6 +48,12 @@ This started as a from-scratch replacement whose main job was to **autostart a p
 - **Own the whole stack** — trip computer, updates, reboot — so nothing depends on an abandoned third-party app, and it can all be improved over the air without a flash drive.
 
 ---
+
+## Promo video
+
+[![BMW iDrive Launcher promo, short loop](screenshots/promo-ignition.gif)](https://github.com/cheRoma/bmw-idrive-launcher/releases/download/v1.6.46/bmw-idrive-launcher-promo.mp4)
+
+A 36-second promo cut from the app's real screens: the head unit lights up in the X5, then the carousel, the Yandex Music player, the on-board computer and the settings. [Watch the MP4](https://github.com/cheRoma/bmw-idrive-launcher/releases/download/v1.6.46/bmw-idrive-launcher-promo.mp4) (1080p, 16 MB). The cabin and the head unit in the opening shot are generated; every screen is the real UI.
 
 ## Screenshots
 
