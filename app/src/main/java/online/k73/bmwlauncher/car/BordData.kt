@@ -22,6 +22,8 @@ data class BordData(
     val keyRaw: Int? = null,
     /** Central locking: true=locked, from the GM 0x7A door-status telegram (bit 0x20). */
     val locked: Boolean? = null,
+    /** Latest IKE on-board-computer texts by property (see [ObcPoll]), e.g. 0x04 → "12.4 L/100". */
+    val obc: Map<Int, String> = emptyMap(),
     val updatedAtMs: Long = 0L,
 )
 

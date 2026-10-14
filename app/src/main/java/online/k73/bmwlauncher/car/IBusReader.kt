@@ -85,7 +85,48 @@ class IBusReader(private val appContext: Context) {
             AppLog.pdc(m.joinToString(" ") { "%02X".format(it) })
             _busFrames.value = _busFrames.value + 1
         },
+        // Log an OBC value only when it changes, so a 20-minute drive stays a few dozen lines.
+        onObcText = { prop, text ->
+            if (lastObc.put(prop, text) != text) AppLog.d("OBC", "${ObcPoll.label(prop)} = '$text'")
+        },
     )
+
+    private val lastObc = java.util.concurrent.ConcurrentHashMap<Int, String>()
+    @Volatile private var obcThread: Thread? = null
+
+    /**
+     * Ask the cluster for its on-board-computer values every [ObcPoll.CYCLE_MS] while it is awake.
+     * Runs for the life of the reader; pauses itself (and says so once) when the IKE goes quiet.
+     */
+    private fun startObcPoll() {
+        if (obcThread != null) return
+        val t = Thread {
+            var active = false
+            var sent = 0
+            while (!stopped) {
+                val p = port
+                val go = p != null && ObcPoll.shouldPoll(System.currentTimeMillis(), decoder.lastIkeBroadcastMs)
+                if (go != active) {
+                    active = go
+                    AppLog.d("OBC", if (go) "опрос БК: старт" else "опрос БК: пауза (приборка молчит), запросов $sent")
+                }
+                if (go && p != null) {
+                    for (prop in ObcPoll.polled) {
+                        val f = ObcPoll.request(prop)
+                        runCatching { p.write(ByteArray(f.size) { f[it].toByte() }, 300); sent++ }
+                            .onFailure { AppLog.w("OBC", "write failed: ${it.message}") }
+                        runCatching { Thread.sleep(ObcPoll.GAP_MS) }
+                    }
+                }
+                runCatching { Thread.sleep(ObcPoll.CYCLE_MS) }
+            }
+            obcThread = null
+        }
+        obcThread = t
+        t.isDaemon = true
+        t.name = "ibus-obc"
+        t.start()
+    }
 
     private val _pdcCapturing = MutableStateFlow(false)
     val pdcCapturing: StateFlow<Boolean> = _pdcCapturing
@@ -184,6 +225,7 @@ class IBusReader(private val appContext: Context) {
     fun start() {
         stopped = false
         registerHotplug()
+        startObcPoll()
         runCatching { connect() }.onFailure {
             AppLog.w("IBUS", "start failed: ${it.message}")
             scheduleReconnect("start failed")

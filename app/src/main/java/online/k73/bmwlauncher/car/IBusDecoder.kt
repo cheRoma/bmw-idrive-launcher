@@ -28,6 +28,8 @@ class IBusDecoder(
      *  what the car itself says when a physical button is pressed, instead of guessing telegrams
      *  from documentation — which is how the "mirror" job turned out to drive the windows. */
     private val onBusFrame: (IntArray) -> Unit = {},
+    /** Every IKE on-board-computer reply (`80 .. E7 24 <prop> ..`), see [ObcPoll]. */
+    private val onObcText: (Int, String) -> Unit = { _, _ -> },
 ) {
     private val buf = ArrayDeque<Int>()
     private var cur = BordData(connected = true)
@@ -38,6 +40,9 @@ class IBusDecoder(
 
     /** Whole-bus capture toggle — see [onBusFrame]. Read-only: nothing is ever written to the bus. */
     var busCapture = false
+
+    /** When the IKE last sent a periodic broadcast (speed/rpm or temps) — "the cluster is awake". */
+    @Volatile var lastIkeBroadcastMs = 0L
 
     /** Raw messages, most-recent last — a small ring for on-car diagnostics (hex dump). */
     val recentFrames = ArrayDeque<IntArray>()
@@ -82,6 +87,11 @@ class IBusDecoder(
         val cmd = if (m.size > 3) m[3] else return
         var next = cur
         if (src == 0x80) {                              // IKE
+            if (cmd == 0x18 || cmd == 0x19) lastIkeBroadcastMs = nowMs()
+            ObcPoll.parseReply(m)?.let { (prop, text) ->
+                onObcText(prop, text)
+                if (next.obc[prop] != text) next = next.copy(obc = next.obc + (prop to text))
+            }
             when (cmd) {
                 0x18 -> if (m.size >= 6) next = next.copy(speedKmh = m[4] * 2, rpm = m[5] * 100)
                 0x19 -> if (m.size >= 6) next = next.copy(outsideC = signed(m[4]), coolantC = signed(m[5]))
