@@ -30,6 +30,8 @@ class IBusDecoder(
     private val onBusFrame: (IntArray) -> Unit = {},
     /** Every IKE on-board-computer reply (`80 .. E7 24 <prop> ..`), see [ObcPoll]. */
     private val onObcText: (Int, String) -> Unit = { _, _ -> },
+    /** Every LCM status reply's raw voltage byte, see [ObcPoll.lcmVoltageRaw]. */
+    private val onLcmVoltage: (Int) -> Unit = {},
 ) {
     private val buf = ArrayDeque<Int>()
     private var cur = BordData(connected = true)
@@ -107,6 +109,10 @@ class IBusDecoder(
         // door-open frames (bit 0x01) leave it clear. Drives the auto mirror fold/unfold.
         if (src == 0x00 && cmd == 0x7A && m.size >= 5) {
             next = next.copy(locked = (m[4] and 0x20) != 0)
+        }
+        ObcPoll.lcmVoltageRaw(m)?.let { raw ->
+            onLcmVoltage(raw)
+            if (raw != next.voltageRaw) next = next.copy(voltageRaw = raw)
         }
         if (next != cur) {
             cur = next.copy(connected = true, updatedAtMs = nowMs())

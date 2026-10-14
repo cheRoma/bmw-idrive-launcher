@@ -26,6 +26,23 @@ object ObcPoll {
      */
     const val IKE_ALIVE_MS = 15_000L
 
+    /**
+     * Light module (LCM, 0xD0) status, diagnostic read `3F 03 D0 0B E7`. Read-only: it reports lamp
+     * and voltage state, switches nothing. Payload byte 9 (frame index 13) tracks battery voltage —
+     * 201 with the engine running, 167–179 parked — at a factor that still needs a multimeter check.
+     */
+    val lcmStatusRequest = intArrayOf(0x3F, 0x03, 0xD0, 0x0B, 0xE7)
+
+    /** Ask the LCM once every this many OBC cycles (~30 s). */
+    const val LCM_EVERY_CYCLES = 3
+
+    /** Candidate volts-per-count, from published LCM decodes; verify against a meter. */
+    const val VOLT_FACTOR = 0.0705
+
+    /** Raw voltage byte from an LCM status reply `D0 .. 3F A0 ...`; null if not one. */
+    fun lcmVoltageRaw(m: IntArray): Int? =
+        if (m.size > 14 && m[0] == 0xD0 && m[2] == 0x3F && m[3] == 0xA0) m[13] else null
+
     fun shouldPoll(nowMs: Long, lastIkeBroadcastMs: Long): Boolean =
         lastIkeBroadcastMs > 0 && nowMs - lastIkeBroadcastMs in 0..IKE_ALIVE_MS
 

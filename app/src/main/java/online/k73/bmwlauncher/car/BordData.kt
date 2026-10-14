@@ -26,6 +26,8 @@ data class BordData(
     val obc: Map<Int, String> = emptyMap(),
     /** Odometer from the IKE `0x17` broadcast, km. */
     val odometerKm: Int? = null,
+    /** Raw battery-voltage byte from the light module's status (×[ObcPoll.VOLT_FACTOR] ≈ volts). */
+    val voltageRaw: Int? = null,
     val updatedAtMs: Long = 0L,
 )
 

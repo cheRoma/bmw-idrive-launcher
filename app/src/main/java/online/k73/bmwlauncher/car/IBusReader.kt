@@ -89,12 +89,19 @@ class IBusReader(private val appContext: Context) {
             _busFrames.value = _busFrames.value + 1
         },
         // Log an OBC value only when it changes, so a 20-minute drive stays a few dozen lines.
+        onLcmVoltage = { raw ->
+            if (raw != lastVoltRaw) {
+                lastVoltRaw = raw
+                AppLog.d("VOLT", "LCM raw=$raw ≈ ${"%.2f".format(java.util.Locale.ROOT, raw * ObcPoll.VOLT_FACTOR)} V")
+            }
+        },
         onObcText = { prop, text ->
             if (lastObc.put(prop, text) != text) AppLog.d("OBC", "${ObcPoll.label(prop)} = '$text'")
         },
     )
 
     private val lastObc = java.util.concurrent.ConcurrentHashMap<Int, String>()
+    @Volatile private var lastVoltRaw = -1
     @Volatile private var obcThread: Thread? = null
 
     /**
@@ -106,6 +113,7 @@ class IBusReader(private val appContext: Context) {
         val t = Thread {
             var active = false
             var sent = 0
+            var cycle = 0
             while (!stopped) {
                 val p = port
                 val go = p != null && ObcPoll.shouldPoll(System.currentTimeMillis(), decoder.lastIkeBroadcastMs)
@@ -119,6 +127,11 @@ class IBusReader(private val appContext: Context) {
                         runCatching { p.write(ByteArray(f.size) { f[it].toByte() }, 300); sent++ }
                             .onFailure { AppLog.w("OBC", "write failed: ${it.message}") }
                         runCatching { Thread.sleep(ObcPoll.GAP_MS) }
+                    }
+                    if (cycle++ % ObcPoll.LCM_EVERY_CYCLES == 0) {
+                        val f = ObcPoll.lcmStatusRequest
+                        runCatching { p.write(ByteArray(f.size) { f[it].toByte() }, 300) }
+                            .onFailure { AppLog.w("VOLT", "write failed: ${it.message}") }
                     }
                 }
                 runCatching { Thread.sleep(ObcPoll.CYCLE_MS) }

@@ -39,3 +39,23 @@ class ObcPollTest {
         assertEquals(42L, d.lastIkeBroadcastMs)
     }
 }
+
+class LcmVoltageTest {
+    // 2026-10-14 log, parked: D0 23 3F A0 C1 C0 00 00 00 00 00 00 00 B3 ... → raw 0xB3 = 179
+    private val reply = intArrayOf(
+        0xD0, 0x23, 0x3F, 0xA0, 0xC1, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xB3, 0x00, 0x00,
+        0x00, 0x08, 0x10, 0x55, 0x02, 0x00, 0x28, 0x00, 0x00, 0x00, 0x00, 0x02, 0x05, 0x00, 0x00, 0x00,
+        0x00, 0xFF, 0xFF, 0x00, 0xBE,
+    )
+
+    @Test fun reads_the_voltage_byte() = assertEquals(179, ObcPoll.lcmVoltageRaw(reply))
+
+    @Test fun request_checksum_is_valid() =
+        assertEquals(0xE7, MirrorTelegrams.checksum(ObcPoll.lcmStatusRequest.copyOfRange(0, 4)))
+
+    @Test fun decoder_carries_the_raw_byte() {
+        var last: BordData? = null
+        IBusDecoder(nowMs = { 0L }, emit = { last = it }).feed(ByteArray(reply.size) { reply[it].toByte() }, reply.size)
+        assertEquals(179, last?.voltageRaw)
+    }
+}
