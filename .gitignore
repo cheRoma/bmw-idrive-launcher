@@ -16,3 +16,8 @@ keystore.properties
 
 # Watchdog logs
 reports/
+.gstack/
+
+# Local status notes (infra details, repo is public)
+STATUS.md
+CLAUDE.md
