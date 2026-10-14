@@ -25,7 +25,7 @@ import online.k73.bmwlauncher.ui.theme.TypeTokens
 
 /** iDrive-style top strip (Claude Design). [temp] is null → hidden until the Microntek broadcast is wired. */
 @Composable
-fun StatusRibbon(time: String, date: String, temp: String?, modifier: Modifier = Modifier) {
+fun StatusRibbon(time: String, date: String, temp: String?, modifier: Modifier = Modifier, notice: String? = null) {
     val c = LocalLauncherColors.current
     Column(modifier.fillMaxWidth()) {
         Row(
@@ -53,6 +53,17 @@ fun StatusRibbon(time: String, date: String, temp: String?, modifier: Modifier =
                 fontSize = TypeTokens.body,
                 modifier = Modifier.weight(1f),
             )
+            // Maintenance reminder (oil change due) — amber, only when it is close.
+            if (notice != null) {
+                Text(
+                    notice,
+                    color = c.accent,
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 17.sp,
+                    modifier = Modifier.padding(end = 18.dp),
+                )
+            }
             // Live outside temperature from the car's I-Bus (replaces the X5 badge). Hidden until a
             // reading arrives.
             if (temp != null) {

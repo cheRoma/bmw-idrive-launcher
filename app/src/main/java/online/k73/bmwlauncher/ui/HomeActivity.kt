@@ -29,6 +29,7 @@ import online.k73.bmwlauncher.autostart.LauncherForeground
 import online.k73.bmwlauncher.data.LauncherSettings
 import online.k73.bmwlauncher.data.SettingsStore
 import online.k73.bmwlauncher.diag.AppLog
+import online.k73.bmwlauncher.data.OilStore
 import online.k73.bmwlauncher.diag.LogSendState
 import online.k73.bmwlauncher.diag.LogUploader
 import online.k73.bmwlauncher.launch.AppLauncher
@@ -444,9 +445,13 @@ class HomeActivity : ComponentActivity() {
                             // Live outside temperature from the shared I-Bus reader → status bar.
                             val ibus = remember { IBusService.get(applicationContext) }
                             val bord by ibus.data.collectAsState()
+                            val oilStore = remember { OilStore.get(applicationContext) }
+                            val oil by oilStore.oil.collectAsState()
+                            val savedOdo by oilStore.odometerKm.collectAsState()
                             HomeCarousel(
                                 now = nowDateTime,
                                 temp = bord.outsideC?.let { "$it°" },
+                                notice = oil.ribbonText(bord.odometerKm ?: savedOdo),
                                 onTile = { id ->
                                     AppLog.d("NAV", "tile tapped: $id")
                                     when (id) {

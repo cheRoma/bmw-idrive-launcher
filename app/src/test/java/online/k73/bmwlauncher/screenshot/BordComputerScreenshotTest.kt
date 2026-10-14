@@ -37,6 +37,19 @@ class BordComputerScreenshotTest {
         outsideC = -8,
     )
 
+    @Test fun bordcomputer_oil_soon() {
+        paparazzi.snapshot {
+            BmwLauncherTheme(isNight = true) {
+                BordComputerContent(
+                    data = live,
+                    oilLine = "Масло: через 250 км · замена на 284\u202F332",
+                    oilStatus = online.k73.bmwlauncher.car.OilChange.Status.SOON,
+                    oilCanMark = true,
+                )
+            }
+        }
+    }
+
     @Test fun bordcomputer_live() {
         paparazzi.snapshot {
             BmwLauncherTheme(isNight = true) { BordComputerContent(data = live) }

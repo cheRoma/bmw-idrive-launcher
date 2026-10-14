@@ -1,5 +1,7 @@
 package online.k73.bmwlauncher.car
 
+import online.k73.bmwlauncher.data.OilStore
+
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -65,6 +67,7 @@ class IBusReader(private val appContext: Context) {
             snap.speedKmh?.let { trip.onSpeed(it, System.currentTimeMillis()) }
             _data.value = snap.copy(avgSpeedKmh = trip.averageKmh.roundToInt().takeIf { trip.hasData })
             onSnapshotForMirrors(snap)
+            snap.odometerKm?.let { runCatching { OilStore.get(appContext).saveOdometer(it) } }
         },
         // Log one example of each distinct message type so an uploaded log inventories the whole bus
         // (this is how we decode fuel/consumption/etc. from real data).

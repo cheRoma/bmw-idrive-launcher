@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,7 +32,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import online.k73.bmwlauncher.car.BordData
 import online.k73.bmwlauncher.car.IBusService
+import online.k73.bmwlauncher.car.OilChange
 import online.k73.bmwlauncher.car.PdcStats
+import online.k73.bmwlauncher.data.OilStore
+import online.k73.bmwlauncher.diag.AppLog
 import online.k73.bmwlauncher.ui.theme.Inter
 import online.k73.bmwlauncher.ui.theme.LocalLauncherColors
 import online.k73.bmwlauncher.ui.theme.pressScale
@@ -46,6 +50,10 @@ fun BordComputerScreen(onBack: () -> Unit = {}) {
     val pdcStats by reader.pdcStats.collectAsState()
     val scope = rememberCoroutineScope()
     var message by remember { mutableStateOf<String?>(null) }
+    val oilStore = remember { OilStore.get(appCtx) }
+    val oil by oilStore.oil.collectAsState()
+    val savedOdo by oilStore.odometerKm.collectAsState()
+    val odo = data.odometerKm ?: savedOdo
     // Hardware/gesture «Назад» also leaves the screen (this unit has a real Back key).
     BackHandler { onBack() }
 
@@ -69,6 +77,16 @@ fun BordComputerScreen(onBack: () -> Unit = {}) {
             }
         },
         onTogglePdc = { reader.setPdcCapture(!pdcOn) },
+        oilLine = oil.summary(odo),
+        oilStatus = odo?.let { oil.status(it) } ?: OilChange.Status.OK,
+        oilCanMark = odo != null,
+        onOilChanged = {
+            odo?.let {
+                oilStore.markChanged(it)
+                AppLog.d("OIL", "oil changed at $it km")
+                message = "Записал замену масла на ${OilChange.km(it)} км"
+            }
+        },
     )
 }
 
@@ -89,6 +107,10 @@ fun BordComputerContent(
     onResetTrip: () -> Unit = {},
     onClearLimit: () -> Unit = {},
     onTogglePdc: () -> Unit = {},
+    oilLine: String? = null,
+    oilStatus: OilChange.Status = OilChange.Status.OK,
+    oilCanMark: Boolean = false,
+    onOilChanged: () -> Unit = {},
 ) {
     val c = LocalLauncherColors.current
     Column(Modifier.fillMaxSize().background(c.background).padding(horizontal = 40.dp, vertical = 20.dp)) {
@@ -128,6 +150,11 @@ fun BordComputerContent(
 
         Spacer(Modifier.weight(1f))
 
+        if (oilLine != null) {
+            OilRow(oilLine, oilStatus, oilCanMark, onOilChanged)
+            Spacer(Modifier.height(10.dp))
+        }
+
         // All three actions on ONE row: two rows of pills did not fit the 432 dp and the last one
         // was clipped by the bottom edge.
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -153,6 +180,32 @@ fun BordComputerContent(
             line ?: "",
             color = if (pdcOn && pdcStats.replies > 0) c.callGreen else c.textDim,
             fontFamily = Inter, fontSize = 13.sp,
+        )
+    }
+}
+
+/**
+ * Oil countdown + «Заменил сегодня». The button asks twice: a stray tap while driving must not
+ * silently restart a 4 000 km countdown, and a dialog would be heavier than a second tap.
+ */
+@Composable
+private fun OilRow(line: String, status: OilChange.Status, canMark: Boolean, onChanged: () -> Unit) {
+    val c = LocalLauncherColors.current
+    var armed by remember { mutableStateOf(false) }
+    LaunchedEffect(armed) { if (armed) { kotlinx.coroutines.delay(5_000); armed = false } }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        androidx.compose.material3.Text(
+            line,
+            color = if (status == OilChange.Status.OK) c.textDim else c.accent,
+            fontFamily = Inter, fontSize = 16.sp,
+            fontWeight = if (status == OilChange.Status.OK) FontWeight.Normal else FontWeight.SemiBold,
+            maxLines = 1, modifier = Modifier.weight(1f),
+        )
+        ActionPill(
+            if (armed) "Точно заменил?" else "Заменил сегодня",
+            enabled = canMark,
+            active = armed,
+            onClick = { if (armed) { armed = false; onChanged() } else armed = true },
         )
     }
 }

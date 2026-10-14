@@ -88,6 +88,7 @@ class IBusDecoder(
         var next = cur
         if (src == 0x80) {                              // IKE
             if (cmd == 0x18 || cmd == 0x19) lastIkeBroadcastMs = nowMs()
+            odometerFrom(m)?.let { if (it != next.odometerKm) next = next.copy(odometerKm = it) }
             ObcPoll.parseReply(m)?.let { (prop, text) ->
                 onObcText(prop, text)
                 if (next.obc[prop] != text) next = next.copy(obc = next.obc + (prop to text))

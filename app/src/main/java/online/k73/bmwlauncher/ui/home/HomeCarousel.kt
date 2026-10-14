@@ -48,6 +48,7 @@ fun HomeCarousel(
     tiles: List<Tile> = defaultTiles,
     now: LocalDateTime,
     temp: String? = null,
+    notice: String? = null,
     onTile: (TileId) -> Unit = {},
 ) {
     val c = LocalLauncherColors.current
@@ -76,7 +77,7 @@ fun HomeCarousel(
         val sidePadding = (maxWidth - PageWidth) / 2
         AmbientGlow()
         Column(Modifier.fillMaxSize()) {
-            StatusRibbon(RibbonClock.time(now), RibbonClock.date(now), temp)
+            StatusRibbon(RibbonClock.time(now), RibbonClock.date(now), temp, notice = notice)
             HorizontalPager(
                 state = pagerState,
                 pageSize = PageSize.Fixed(PageWidth),

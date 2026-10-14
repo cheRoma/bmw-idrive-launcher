@@ -24,6 +24,8 @@ data class BordData(
     val locked: Boolean? = null,
     /** Latest IKE on-board-computer texts by property (see [ObcPoll]), e.g. 0x04 → "12.4 L/100". */
     val obc: Map<Int, String> = emptyMap(),
+    /** Odometer from the IKE `0x17` broadcast, km. */
+    val odometerKm: Int? = null,
     val updatedAtMs: Long = 0L,
 )
 
