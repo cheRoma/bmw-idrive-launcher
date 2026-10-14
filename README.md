@@ -88,7 +88,7 @@ A 36-second promo cut from the app's real screens: the head unit lights up in th
 ### Music — Yandex Music now-playing (player screen v4)
 - Controls **Yandex Music** via the Android `MediaSession` / `MediaController` framework (no reverse-engineering) using a `NotificationListenerService`.
 - **v4 player screen:** the **album cover fills the whole background** (scrim + vignette keep text legible); a **calm amber seek bar** shows progress. Transport row is *shuffle · prev · play/pause · next · like*, with a tap-and-drag seek. *(An earlier animated "equalizer" was dropped: the head-unit ROM blocks audio capture, so any analyzer was necessarily synthetic and read as fake.)*
-- **Reliable cold-start:** opening Music auto-wakes Yandex; if a fully-killed app won't resume in the background, an explicit **"Включить музыку"** button foreground-launches it so «Моя волна» starts, then drops you back on the now-playing screen.
+- **Cold start into a fresh «Моя волна»:** if nothing is playing when you open Music, the launcher opens Yandex through the `yandexmusic://radio/user/onyourwave?play=true` link, waits for the wave to start, and brings you back to the now-playing screen. Yandex's own screen shows for 3 to 4 seconds. A media-button PLAY would be quieter, but it resumes whatever queue was left on the head unit, not your wave.
 
 ### Video — YouTube behind a per-app VPN, plus ivi
 - A **YouTube** tile that opens the app, and an **ivi** tile beside it (it tries the phone build and the Android-TV one and launches whichever is installed). YouTube is throttled/blocked in Russia, so it runs behind a **DPI-bypassing VPN** (VLESS + Reality via [sing-box](https://sing-box.sagernet.org/)) configured as an **always-on, _per-app_ `VpnService`** — only YouTube's traffic egresses through the tunnel; everything else (Yandex, navigation) stays direct. No runtime root needed. Design: [`youtube-vpn-design.md`](docs/superpowers/specs/2026-07-06-youtube-vpn-design.md).
@@ -327,6 +327,7 @@ The app self-updates so improvements ship without a flash drive:
 
 | Version | Highlights |
 |---|---|
+| **1.6.48–1.6.49** | **Music starts a fresh «Моя волна» again.** Yandex Music 2026.09.5 auto-updated on the unit, disabled its old `MusicBrowserService` and moved to a media3 `Media3LibraryService`. The new service rejects third-party browse clients too, so the headless start never had a way in. A media-button PLAY does wake a killed Yandex now, but it resumes the queue left on the head unit: tracks from an old drive instead of the wave the phone was playing, which sounded like somebody else's taste. Cold start now opens Yandex through `yandexmusic://radio/user/onyourwave?play=true`, the same thing the big yellow button does, lets it start the wave on its own for up to 6 seconds, and only then falls back to PLAY. Checked on the car with Yandex force-stopped: the wave started in 3.6 s with a new queue, and the launcher came back on top. Two other links (`rotor/user:onyourwave`, `wave`) did nothing. `YandexBrowserStarter` is gone, since neither service lets it in |
 | **1.6.47** | **The navigator is chosen in Settings** — the НАВИГАТОР tile opens Яндекс Навигатор or Yango Maps, and the choice can be flipped mid-trip instead of in a new build. Yango carries the same maps and traffic without the ads, but it is Яндекс Карты with a navigation mode rather than the driver-first Навигатор, and only driving both will settle which is better. A tile pointed at an app that was never installed now says so in the log instead of swallowing the tap |
 | **1.6.46** | **The second map turned out to be a second Activity** — diagnostics reported `created=2 destroyed=0`, and the `RememberObserver` added in 1.6.43 was not at fault: two `HomeActivity` instances were alive, each owning a map view. With the accessibility service off, `BringHome` started `HomeActivity` by class with `NEW_TASK`, and an explicit component start does not land in the home task — the system keeps the instance it launched there and ours sits beside it in a task of its own. A HOME intent does land there, so the existing instance gets `onNewIntent` instead. Pinned to our package so a moment when we are not the default HOME cannot hand the driver somebody else's launcher |
 | **1.6.44–1.6.45** | **A movie tile next to YouTube** — Кинопоиск first, already installed and signed in on the unit but reachable only through the app drawer. One version later VK Видео took its place: the WiFi the car parks on egresses from Tallinn, so Russian services see a foreign datacentre IP and Кинопоиск refuses to load its catalogue at all, while VK Видео survives that network. Both were checked on the unit before the switch. Its icon is a circle-play, because the rounded-rect one was indistinguishable from the YouTube tile at a glance, which is the only kind of look a driver gets |
@@ -366,9 +367,10 @@ The app self-updates so improvements ship without a flash drive:
 
 *(Done since the roadmap was first written: live map background, our own I-Bus on-board computer, outside temperature in the ribbon, trip average speed, mirror automation, self-repairing diagnostics.)*
 
-**What will not happen:** in-launcher **playlist browsing**. Tested on the car: Yandex Music's
-`MusicBrowserService` rejects us as a third-party browse client (`onConnectionFailed`) — binding only
-wakes its process, the catalogue is never handed over. So "Плейлисты" stays a button that opens the
+**What will not happen:** in-launcher **playlist browsing**. Tested on the car: Yandex Music rejects us
+as a third-party browse client (`onConnectionFailed`). That held for the old `MusicBrowserService` and
+holds for `Media3LibraryService`, which replaced it in Yandex 2026.09. Binding only wakes the process;
+the catalogue is never handed over. So "Плейлисты" stays a button that opens the
 Yandex app; transport control and now-playing over `MediaSession` work in full.
 
 ---
