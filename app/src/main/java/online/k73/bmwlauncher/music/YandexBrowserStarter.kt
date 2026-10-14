@@ -2,6 +2,7 @@ package online.k73.bmwlauncher.music
 
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.support.v4.media.MediaBrowserCompat
 import android.support.v4.media.session.MediaControllerCompat
 import online.k73.bmwlauncher.diag.AppLog
@@ -26,7 +27,8 @@ class YandexBrowserStarter(private val context: Context, private val pkg: String
 
     /** @param onConnected true once we've issued a headless play command, false if we couldn't. */
     fun start(onConnected: (Boolean) -> Unit) {
-        val component = ComponentName(pkg, SERVICE)
+        val component = ComponentName(pkg, resolveService())
+        AppLog.d("MUSIC", "browser target: ${component.className}")
         val cb = object : MediaBrowserCompat.ConnectionCallback() {
             override fun onConnected() {
                 val ok = runCatching {
@@ -86,7 +88,28 @@ class YandexBrowserStarter(private val context: Context, private val pkg: String
         browser = null
     }
 
-    private companion object {
-        const val SERVICE = "ru.yandex.music.common.media.mediabrowser.MusicBrowserService"
+    /**
+     * Ask the system which browse service Yandex currently has ENABLED. Yandex 2026.09 disabled the
+     * legacy MusicBrowserService and moved to a media3 Media3LibraryService, so a hard-coded class
+     * name silently fails; resolving by intent follows whatever the installed version exposes.
+     */
+    private fun resolveService(): String {
+        val found = runCatching {
+            context.packageManager
+                .queryIntentServices(Intent(BROWSER_ACTION).setPackage(pkg), 0)
+                .map { it.serviceInfo.name }
+        }.getOrDefault(emptyList())
+        return pickBrowserService(found)
+    }
+
+    internal companion object {
+        const val BROWSER_ACTION = "android.media.browse.MediaBrowserService"
+        const val LEGACY_SERVICE = "ru.yandex.music.common.media.mediabrowser.MusicBrowserService"
+
+        /** Prefer a media3 library service, then any resolved one, then the legacy name. */
+        fun pickBrowserService(resolved: List<String>): String =
+            resolved.firstOrNull { "Media3" in it || "Library" in it }
+                ?: resolved.firstOrNull()
+                ?: LEGACY_SERVICE
     }
 }
