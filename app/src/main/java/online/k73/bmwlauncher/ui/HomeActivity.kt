@@ -207,9 +207,16 @@ class HomeActivity : ComponentActivity() {
         // (a launched activity can't be fully hidden without root). Raise if Yandex needs longer.
         const val MUSIC_SETTLE_MS = 1200L
 
-        // After foregrounding Yandex we poll for real playback (nudging PLAY) before pulling our
-        // launcher back, so we never return before «Моя волна» starts. Bounded by MAX so a stuck
-        // Yandex can't hang us on its own screen forever.
+        // After foregrounding Yandex we first give it this long to start «Моя волна» ON ITS OWN:
+        // only an opened Yandex picks up the wave the phone was playing, while a PLAY nudge resumes
+        // the head unit's stale local queue (seen 2026-10-14 on Yandex 2026.09.5).
+        const val MUSIC_SELF_START_MS = 6000L
+
+        // Deep link that starts the account's «Моя волна» (verified on Yandex 2026.09.5).
+        const val YANDEX_WAVE_URI = "yandexmusic://radio/user/onyourwave?play=true"
+
+        // Then we poll for real playback (nudging PLAY) before pulling our launcher back, so we never
+        // return before music starts. Bounded by MAX so a stuck Yandex can't hang us on its own screen.
         const val MUSIC_POLL_MS = 400L
         const val MUSIC_FOREGROUND_MAX_MS = 5000L
     }
@@ -220,21 +227,37 @@ class HomeActivity : ComponentActivity() {
      * and reorder our launcher back to the front. Yandex only flickers; our now-playing then binds.
      */
     private fun launchYandexAndReturn(pkg: String) {
-        val intent = launcher.launchIntentFor(pkg)?.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION) ?: return
-        startActivity(intent)
+        // Open straight into a fresh «Моя волна» of the account (same as Yandex's big Play button):
+        // a plain launch shows the wave screen paused, and a PLAY nudge then resumes the head unit's
+        // stale local queue. Falls back to the plain launch if the link stops resolving.
+        val wave = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(YANDEX_WAVE_URI)).setPackage(pkg)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
+        val started = runCatching { startActivity(wave); true }.getOrDefault(false)
+        if (!started) {
+            val intent = launcher.launchIntentFor(pkg)?.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION) ?: return
+            startActivity(intent)
+        }
+        AppLog.d("MUSIC", "foreground: ${if (started) "wave link" else "plain launch"}")
         lifecycleScope.launch {
             // Let Yandex reach the foreground, then wait until «Моя волна» actually starts (nudging
             // PLAY each poll), and only THEN pull our launcher back. Returning too early yanks Yandex
             // to the background before it begins → nothing plays (the old MUSIC_SETTLE-only bug).
             kotlinx.coroutines.delay(MUSIC_SETTLE_MS)
-            var waited = 0L
-            while (waited < MUSIC_FOREGROUND_MAX_MS) {
-                runCatching { musicRepo.sendPlay(pkg) }
-                val playing = runCatching {
+            val playing = {
+                runCatching {
                     musicRepo.activeController(pkg)?.playbackState?.state ==
                         android.media.session.PlaybackState.STATE_PLAYING
                 }.getOrDefault(false)
-                if (playing) break
+            }
+            var waited = 0L
+            while (waited < MUSIC_SELF_START_MS && !playing()) {
+                kotlinx.coroutines.delay(MUSIC_POLL_MS)
+                waited += MUSIC_POLL_MS
+            }
+            AppLog.d("MUSIC", "foreground: self-start ${if (playing()) "ok" else "timed out"} after ${waited}ms")
+            waited = 0L
+            while (waited < MUSIC_FOREGROUND_MAX_MS && !playing()) {
+                runCatching { musicRepo.sendPlay(pkg) }
                 kotlinx.coroutines.delay(MUSIC_POLL_MS)
                 waited += MUSIC_POLL_MS
             }

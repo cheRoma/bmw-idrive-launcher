@@ -33,8 +33,6 @@ class MusicViewModel(
 
     private var tickJob: kotlinx.coroutines.Job? = null
     private var wakeJob: kotlinx.coroutines.Job? = null
-    // Headless playback starter: connects to Yandex's MediaBrowserService (no UI flash).
-    private val browserStarter by lazy { YandexBrowserStarter(context, targetPackage) }
     // Foreground launcher (opens the Yandex app so «Моя волна» starts). Stored so the retry button
     // can trigger it; injected by the UI via [start].
     private var foregroundLauncher: ((String) -> Unit)? = null
@@ -50,45 +48,13 @@ class MusicViewModel(
         tickJob = scope.launch {
             while (true) { rebind(); refresh(); delay(1000) }
         }
-        // Auto cold-start: opening Music with nothing playing should try to start it, no extra tap.
-        if (controller?.isPlaying() != true) wake(scope)
+        // Auto cold-start: opening Music with nothing playing opens Yandex itself, no extra tap. A
+        // headless media-button wake is faster but resumes the head unit's stale local queue instead
+        // of the wave the phone was playing — Roma chose the brief Yandex screen (2026-10-14).
+        if (controller?.isPlaying() != true) launchForeground(scope)
     }
 
-    /**
-     * Background wake: send a media-button PLAY (no full-app UI) and, if a session binds, nudge it a
-     * few times over ~3s. This resumes a WARM (paused) Yandex silently. A truly-killed Yandex comes
-     * up idle with no queue, so play() is a no-op → we mark [ColdStartPhase.FAILED] and the UI shows
-     * an explicit "Включить музыку" button (which opens Yandex foreground — the only reliable way).
-     */
-    fun wake(scope: CoroutineScope) {
-        if (_coldStart.value == ColdStartPhase.WAKING) return
-        AppLog.d("MUSIC", "cold-start: background wake -> $targetPackage")
-        _coldStart.value = ColdStartPhase.WAKING
-        // Preferred headless wake (no Yandex UI flash): binding Yandex's MediaBrowserService starts
-        // its process and loads the last queue («Моя волна») even though it REJECTS us as a browse
-        // client — so it comes up PAUSED, and we then just nudge play(). Runs alongside the
-        // media-button; the poll below sends play() once the session binds.
-        runCatching { browserStarter.start { ok -> AppLog.d("MUSIC", "browser start issued: $ok") } }
-        repo.sendPlay(targetPackage)
-        wakeJob?.cancel()
-        wakeJob = scope.launch {
-            var tries = 0
-            // A fully-killed Yandex takes ~8s to spin up + expose its (paused) session, so keep
-            // nudging play() well past that before falling back to a foreground launch.
-            while (tries < 26) { // ~13s
-                delay(500); rebind(); refresh()
-                controller?.let { ctl ->
-                    if (ctl.isPlaying()) { _coldStart.value = ColdStartPhase.IDLE; return@launch }
-                    runCatching { ctl.play() } // resume the bound-but-paused session
-                }
-                tries++
-            }
-            _coldStart.value = ColdStartPhase.FAILED
-            AppLog.w("MUSIC", "cold-start: background wake failed — offering foreground launch")
-        }
-    }
-
-    /** Retry button: open Yandex in the FOREGROUND so «Моя волна» auto-plays; state fills in via ticks. */
+    /** Open Yandex in the FOREGROUND so «Моя волна» auto-plays; state fills in via ticks. */
     fun launchForeground(scope: CoroutineScope) {
         val lf = foregroundLauncher ?: return
         AppLog.d("MUSIC", "cold-start: foreground launch -> $targetPackage")
@@ -97,7 +63,7 @@ class MusicViewModel(
         wakeJob?.cancel()
         wakeJob = scope.launch {
             var tries = 0
-            while (tries < 16) { // ~8s — foreground Yandex needs longer to spin up + start
+            while (tries < 30) { // ~15s — covers the launcher's settle + self-start + nudge window
                 delay(500); rebind(); refresh()
                 if (controller?.isPlaying() == true) { _coldStart.value = ColdStartPhase.IDLE; return@launch }
                 tries++
@@ -109,7 +75,6 @@ class MusicViewModel(
     fun stop() {
         tickJob?.cancel(); tickJob = null
         wakeJob?.cancel(); wakeJob = null
-        runCatching { browserStarter.release() }
         callback?.let { rawController?.unregisterCallback(it) }
         sessionsListener?.let { repo.stopObserving(it) }
     }
