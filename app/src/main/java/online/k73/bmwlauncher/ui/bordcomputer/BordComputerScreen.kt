@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +33,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import online.k73.bmwlauncher.car.BordData
+import online.k73.bmwlauncher.car.BordFormat
+import online.k73.bmwlauncher.car.ObcPoll
 import online.k73.bmwlauncher.car.IBusService
 import online.k73.bmwlauncher.car.OilChange
 import online.k73.bmwlauncher.car.PdcStats
@@ -41,7 +45,7 @@ import online.k73.bmwlauncher.ui.theme.LocalLauncherColors
 import online.k73.bmwlauncher.ui.theme.pressScale
 
 @Composable
-fun BordComputerScreen(onBack: () -> Unit = {}) {
+fun BordComputerScreen(onBack: () -> Unit = {}, onTrips: () -> Unit = {}) {
     val appCtx = LocalContext.current.applicationContext
     // Shared process-wide reader (also feeds the home status bar) — already connected, no start/stop here.
     val reader = remember { IBusService.get(appCtx) }
@@ -77,6 +81,8 @@ fun BordComputerScreen(onBack: () -> Unit = {}) {
             }
         },
         onTogglePdc = { reader.setPdcCapture(!pdcOn) },
+        onTrips = onTrips,
+        odometerKm = odo,
         oilLine = oil.summary(odo),
         oilStatus = odo?.let { oil.status(it) } ?: OilChange.Status.OK,
         oilCanMark = odo != null,
@@ -111,6 +117,8 @@ fun BordComputerContent(
     oilStatus: OilChange.Status = OilChange.Status.OK,
     oilCanMark: Boolean = false,
     onOilChanged: () -> Unit = {},
+    onTrips: () -> Unit = {},
+    odometerKm: Int? = data.odometerKm,
 ) {
     val c = LocalLauncherColors.current
     Column(Modifier.fillMaxSize().background(c.background).padding(horizontal = 40.dp, vertical = 20.dp)) {
@@ -125,26 +133,24 @@ fun BordComputerContent(
             StatusPill(data)
         }
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(14.dp))
 
         if (!data.connected && data.speedKmh == null) {
             WaitState(c.textDim, data.connected)
         } else {
-            // Hero speed
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.Bottom) {
-                androidx.compose.material3.Text(
-                    data.speedKmh?.toString() ?: "—",
-                    color = c.text, fontFamily = Inter, fontSize = 88.sp, fontWeight = FontWeight.Bold,
-                )
-                Spacer(Modifier.size(10.dp))
-                androidx.compose.material3.Text("км/ч", color = c.textDim, fontFamily = Inter, fontSize = 24.sp, modifier = Modifier.padding(bottom = 18.dp))
-            }
-            Spacer(Modifier.height(16.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            // 2.0: no hero speed (the speedometer already shows it); two rows of four instead.
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                StatCell("Расход", BordFormat.consumption(data.obc[ObcPoll.CONSUMPTION_1]) ?: "—", "л/100", Modifier.weight(1f))
+                StatCell("Запас хода", BordFormat.rangeKm(data.obc[ObcPoll.RANGE]) ?: "—", "км", Modifier.weight(1f))
+                StatCell("АКБ", BordFormat.voltsText(data.voltageRaw) ?: "—", "В", Modifier.weight(1f))
                 StatCell("Средняя", data.avgSpeedKmh?.let { "$it" } ?: "—", "км/ч", Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 StatCell("Обороты", data.rpm?.let { "$it" } ?: "—", "об/мин", Modifier.weight(1f))
                 StatCell("Двигатель", data.coolantC?.let { "$it°" } ?: "—", "ОЖ", Modifier.weight(1f))
                 StatCell("За бортом", data.outsideC?.let { "$it°" } ?: "—", "C", Modifier.weight(1f))
+                StatCell("Пробег", odometerKm?.let { OilChange.km(it) } ?: "—", "км", Modifier.weight(1f), valueSize = 28)
             }
         }
 
@@ -158,6 +164,7 @@ fun BordComputerContent(
         // All three actions on ONE row: two rows of pills did not fit the 432 dp and the last one
         // was clipped by the bottom edge.
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            ActionPill("Поездки", enabled = true, onClick = onTrips)
             ActionPill("Сбросить среднюю", enabled = true, onClick = onResetTrip)
             ActionPill("Сбросить лимит", enabled = data.connected, onClick = onClearLimit)
             ActionPill(
@@ -245,17 +252,17 @@ private fun StatusPill(data: BordData) {
 }
 
 @Composable
-private fun StatCell(label: String, value: String, unit: String, modifier: Modifier = Modifier) {
+private fun StatCell(label: String, value: String, unit: String, modifier: Modifier = Modifier, valueSize: Int = 34) {
     val c = LocalLauncherColors.current
     Column(
-        modifier.clip(RoundedCornerShape(18.dp)).background(c.tile).padding(horizontal = 16.dp, vertical = 18.dp),
+        modifier.fillMaxHeight().clip(RoundedCornerShape(18.dp)).background(c.tile).padding(horizontal = 16.dp, vertical = 13.dp),
     ) {
         androidx.compose.material3.Text(label.uppercase(), color = c.textTertiary, fontFamily = Inter, fontSize = 12.sp, letterSpacing = 1.5.sp)
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.Bottom) {
-            // 36sp, not 42: a four-digit rpm squeezed the unit label into three wrapped lines.
+            // 34sp by default (36 before 2.0 grew the grid to two rows); a four-digit rpm must not wrap the unit.
             androidx.compose.material3.Text(
-                value, color = c.accent, fontFamily = Inter, fontSize = 36.sp,
+                value, color = c.accent, fontFamily = Inter, fontSize = valueSize.sp,
                 fontWeight = FontWeight.Bold, maxLines = 1,
             )
             Spacer(Modifier.size(6.dp))

@@ -13,8 +13,11 @@ object ObcPoll {
     const val RANGE = 0x06
     const val AVG_SPEED = 0x0A
 
-    /** What the test build asks for, in order, once per cycle. */
-    val polled = intArrayOf(CONSUMPTION_1, CONSUMPTION_2, RANGE, AVG_SPEED)
+    /** What the on-board computer screen shows, asked for once per cycle. */
+    val polled = intArrayOf(CONSUMPTION_1, RANGE)
+
+    /** Clock/date texts change every minute; not worth a log line each. */
+    fun isNoisy(prop: Int): Boolean = prop == 0x01 || prop == 0x02
 
     /** Seconds between cycles: the cluster's own values change slowly, the bus is shared. */
     const val CYCLE_MS = 10_000L

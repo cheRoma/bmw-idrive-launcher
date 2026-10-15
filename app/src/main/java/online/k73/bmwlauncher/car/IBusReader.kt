@@ -1,5 +1,6 @@
 package online.k73.bmwlauncher.car
 
+import kotlinx.coroutines.launch
 import online.k73.bmwlauncher.data.OilStore
 
 import android.app.PendingIntent
@@ -64,7 +65,7 @@ class IBusReader(private val appContext: Context) {
     private val decoder = IBusDecoder(
         nowMs = { System.currentTimeMillis() },
         emit = { snap ->
-            snap.speedKmh?.let { trip.onSpeed(it, System.currentTimeMillis()) }
+            if (snap.keyPosition == KeyPosition.OFF) finishTrip("key off")
             _data.value = snap.copy(avgSpeedKmh = trip.averageKmh.roundToInt().takeIf { trip.hasData })
             onSnapshotForMirrors(snap)
             snap.odometerKm?.let { runCatching { OilStore.get(appContext).saveOdometer(it) } }
@@ -96,9 +97,34 @@ class IBusReader(private val appContext: Context) {
             }
         },
         onObcText = { prop, text ->
-            if (lastObc.put(prop, text) != text) AppLog.d("OBC", "${ObcPoll.label(prop)} = '$text'")
+            if (lastObc.put(prop, text) != text && !ObcPoll.isNoisy(prop)) AppLog.d("OBC", "${ObcPoll.label(prop)} = '$text'")
+        },
+        onSpeedSample = { kmh ->
+            val now = System.currentTimeMillis()
+            trip.onSpeed(kmh, now)
+            val wasActive = tripTracker.active
+            tripTracker.onSpeed(kmh, now, _data.value.odometerKm ?: OilStore.get(appContext).odometerKm.value)
+            if (!wasActive && tripTracker.active) AppLog.d("TRIP", "start")
         },
     )
+
+    private val tripTracker = TripTracker()
+
+    /**
+     * Close the running trip (key off, or the cluster went quiet), store it, and send the logs while
+     * the head unit is still online — the event log lives in memory and a reboot would lose it.
+     */
+    @Synchronized
+    private fun finishTrip(why: String) {
+        if (!tripTracker.active) return
+        val t = tripTracker.end(lastObc[ObcPoll.CONSUMPTION_1])
+        if (t == null) { AppLog.d("TRIP", "too short, dropped ($why)"); return }
+        runCatching { online.k73.bmwlauncher.data.TripStore.get(appContext).add(t) }
+        AppLog.d("TRIP", "end ($why): ${BordFormat.km1(t.distanceKm)} km, ${t.durationMin} min, avg ${t.avgKmh}, max ${t.maxSpeedKmh}, ${t.consumption}")
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            runCatching { online.k73.bmwlauncher.diag.LogUploader.upload(appContext, "trip") }
+        }
+    }
 
     private val lastObc = java.util.concurrent.ConcurrentHashMap<Int, String>()
     @Volatile private var lastVoltRaw = -1
@@ -115,6 +141,7 @@ class IBusReader(private val appContext: Context) {
             var sent = 0
             var cycle = 0
             while (!stopped) {
+                if (tripTracker.idle(System.currentTimeMillis(), decoder.lastIkeBroadcastMs)) finishTrip("cluster quiet")
                 val p = port
                 val go = p != null && ObcPoll.shouldPoll(System.currentTimeMillis(), decoder.lastIkeBroadcastMs)
                 if (go != active) {

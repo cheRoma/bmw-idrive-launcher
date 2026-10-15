@@ -451,7 +451,9 @@ class HomeActivity : ComponentActivity() {
                             HomeCarousel(
                                 now = nowDateTime,
                                 temp = bord.outsideC?.let { "$it°" },
-                                notice = oil.ribbonText(bord.odometerKm ?: savedOdo),
+                                // Battery first: a flat battery strands the car today, an oil change can wait a day.
+                                notice = online.k73.bmwlauncher.car.BordFormat.batteryNotice(bord.voltageRaw, bord.rpm)
+                                    ?: oil.ribbonText(bord.odometerKm ?: savedOdo),
                                 onTile = { id ->
                                     AppLog.d("NAV", "tile tapped: $id")
                                     when (id) {
@@ -479,7 +481,10 @@ class HomeActivity : ComponentActivity() {
                             )
                         }
                         composable("bordcomputer") {
-                            BordComputerScreen(onBack = { nav.popBackStack() })
+                            BordComputerScreen(onBack = { nav.popBackStack() }, onTrips = { nav.navigate("trips") })
+                        }
+                        composable("trips") {
+                            online.k73.bmwlauncher.ui.trips.TripsScreen(onBack = { nav.popBackStack() })
                         }
                         composable("apps") {
                             AppsScreen(

@@ -32,6 +32,9 @@ class IBusDecoder(
     private val onObcText: (Int, String) -> Unit = { _, _ -> },
     /** Every LCM status reply's raw voltage byte, see [ObcPoll.lcmVoltageRaw]. */
     private val onLcmVoltage: (Int) -> Unit = {},
+    /** Every IKE `0x18` speed frame, changed or not — distance integration needs the steady
+     *  cruise samples too, which [emit] (fired only on change) would drop. */
+    private val onSpeedSample: (Int) -> Unit = {},
 ) {
     private val buf = ArrayDeque<Int>()
     private var cur = BordData(connected = true)
@@ -96,7 +99,10 @@ class IBusDecoder(
                 if (next.obc[prop] != text) next = next.copy(obc = next.obc + (prop to text))
             }
             when (cmd) {
-                0x18 -> if (m.size >= 6) next = next.copy(speedKmh = m[4] * 2, rpm = m[5] * 100)
+                0x18 -> if (m.size >= 6) {
+                    onSpeedSample(m[4] * 2)
+                    next = next.copy(speedKmh = m[4] * 2, rpm = m[5] * 100)
+                }
                 0x19 -> if (m.size >= 6) next = next.copy(outsideC = signed(m[4]), coolantC = signed(m[5]))
                 0x11 -> if (m.size >= 5) {
                     val key = keyPosition(m[4])

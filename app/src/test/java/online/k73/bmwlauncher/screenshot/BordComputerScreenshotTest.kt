@@ -35,6 +35,9 @@ class BordComputerScreenshotTest {
         rpm = 2400,
         coolantC = 91,
         outsideC = -8,
+        obc = mapOf(0x04 to "18.2 L/100", 0x06 to "319 KM"),
+        voltageRaw = 199,
+        odometerKm = 284_117,
     )
 
     @Test fun bordcomputer_oil_soon() {
@@ -42,7 +45,7 @@ class BordComputerScreenshotTest {
             BmwLauncherTheme(isNight = true) {
                 BordComputerContent(
                     data = live,
-                    oilLine = "Масло: через 250 км · замена на 284\u202F332",
+                    oilLine = "Масло: через 215 км · замена на 284\u202F332",
                     oilStatus = online.k73.bmwlauncher.car.OilChange.Status.SOON,
                     oilCanMark = true,
                 )
@@ -64,6 +67,38 @@ class BordComputerScreenshotTest {
                     pdcOn = true,
                     pdcStats = PdcStats(sent = 128, echo = 128, replies = 64),
                 )
+            }
+        }
+    }
+}
+
+class TripsScreenshotTest {
+    @get:Rule val paparazzi = Paparazzi(
+        deviceConfig = DeviceConfig.NEXUS_5.copy(
+            screenWidth = 1280, screenHeight = 648, density = Density.HIGH, orientation = ScreenOrientation.LANDSCAPE,
+        ),
+    )
+
+    private val zone = java.time.ZoneId.of("Europe/Moscow")
+    private fun at(h: Int, m: Int, day: Int = 15) =
+        java.time.ZonedDateTime.of(2026, 10, day, h, m, 0, 0, zone).toInstant().toEpochMilli()
+
+    @Test fun trips_list() {
+        val trips = listOf(
+            online.k73.bmwlauncher.car.Trip(at(18, 2), at(18, 41), 35.2, 112, 284_082, "18.2 L/100"),
+            online.k73.bmwlauncher.car.Trip(at(9, 10, 14), at(9, 32, 14), 12.4, 74, null, "17.9 L/100"),
+        )
+        paparazzi.snapshot {
+            BmwLauncherTheme(isNight = true) {
+                online.k73.bmwlauncher.ui.trips.TripsContent(trips, zone = zone, today = java.time.LocalDate.of(2026, 10, 15))
+            }
+        }
+    }
+
+    @Test fun trips_empty() {
+        paparazzi.snapshot {
+            BmwLauncherTheme(isNight = true) {
+                online.k73.bmwlauncher.ui.trips.TripsContent(emptyList(), zone = zone, today = java.time.LocalDate.of(2026, 10, 15))
             }
         }
     }
