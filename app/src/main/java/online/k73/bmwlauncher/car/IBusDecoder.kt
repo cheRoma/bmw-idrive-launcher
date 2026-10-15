@@ -46,7 +46,7 @@ class IBusDecoder(
     /** Whole-bus capture toggle — see [onBusFrame]. Read-only: nothing is ever written to the bus. */
     var busCapture = false
 
-    /** When the IKE last sent a periodic broadcast (speed/rpm or temps) — "the cluster is awake". */
+    /** When the IKE last put anything on the bus — "the cluster is awake". */
     @Volatile var lastIkeBroadcastMs = 0L
 
     /** Raw messages, most-recent last — a small ring for on-car diagnostics (hex dump). */
@@ -92,7 +92,9 @@ class IBusDecoder(
         val cmd = if (m.size > 3) m[3] else return
         var next = cur
         if (src == 0x80) {                              // IKE
-            if (cmd == 0x18 || cmd == 0x19) lastIkeBroadcastMs = nowMs()
+            // Any IKE frame means the cluster is awake. With the key in ACC it sends no speed/temps
+            // but still answers on-board-computer requests, and the screen should fill in parked too.
+            lastIkeBroadcastMs = nowMs()
             odometerFrom(m)?.let { if (it != next.odometerKm) next = next.copy(odometerKm = it) }
             ObcPoll.parseReply(m)?.let { (prop, text) ->
                 onObcText(prop, text)
