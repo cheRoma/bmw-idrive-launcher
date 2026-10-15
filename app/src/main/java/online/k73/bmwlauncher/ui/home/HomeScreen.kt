@@ -26,7 +26,7 @@ val defaultTiles = listOf(
     Tile(TileId.MUSIC, "Музыка", Icons.Filled.MusicNote, priority = true),
     Tile(TileId.NAV, "Навигация", Icons.Outlined.Navigation, priority = true),
     Tile(TileId.APPS, "Приложения", Icons.Outlined.Apps),
-    Tile(TileId.IBUS, "Борткомпьютер", Icons.Outlined.Speed),
+    Tile(TileId.IBUS, "БК", Icons.Outlined.Speed),
     Tile(TileId.SETTINGS, "Настройки", Icons.Outlined.Tune),
     Tile(TileId.CARPLAY, "CarPlay", Icons.Outlined.Cast),
     Tile(TileId.YOUTUBE, "YouTube", Icons.Outlined.SmartDisplay),
