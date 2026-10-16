@@ -85,6 +85,15 @@ class CheckControlTest {
         assertNull(CheckControlGuide.hint(setOf(Lamp.BRAKE_LEFT, Lamp.REAR_RIGHT)))
     }
 
+    @Test fun history_skips_cycling_repeats() {
+        var h = emptyList<CcEntry>()
+        listOf(0L to "CHECK BRAKE LIGHTS", 3_000L to "CHECK REAR LIGHTS", 6_000L to "CHECK BRAKE LIGHTS", 9_000L to "CHECK REAR LIGHTS")
+            .forEach { (t, m) -> h = CheckControlStore.withEntry(h, CcEntry(t, m)) }
+        assertEquals(listOf("CHECK REAR LIGHTS", "CHECK BRAKE LIGHTS"), h.map { it.text })
+        h = CheckControlStore.withEntry(h, CcEntry(11 * 60_000L, "CHECK BRAKE LIGHTS"))
+        assertEquals(3, h.size)
+    }
+
     @Test fun store_round_trips() {
         val list = listOf(CcEntry(1_792_086_720_436, "CHECK BRAKE LIGHTS"), CcEntry(5, "LIMIT 6 KM/H"))
         assertEquals(list, CheckControlStore.decode(CheckControlStore.encode(list)))

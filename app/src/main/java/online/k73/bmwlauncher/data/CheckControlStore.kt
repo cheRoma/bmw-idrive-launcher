@@ -33,7 +33,8 @@ class CheckControlStore private constructor(context: Context) {
     @Synchronized
     fun show(text: String, nowMs: Long = System.currentTimeMillis()) {
         _active.value = text
-        val list = (listOf(CcEntry(nowMs, text)) + _history.value).take(MAX)
+        val list = withEntry(_history.value, CcEntry(nowMs, text))
+        if (list === _history.value) return
         runCatching { file.writeText(encode(list)) }
         _history.value = list
     }
@@ -46,6 +47,16 @@ class CheckControlStore private constructor(context: Context) {
 
     companion object {
         const val MAX = 100
+
+        /** The cluster cycles its messages («CHECK BRAKE LIGHTS» ⇄ «CHECK REAR LIGHTS» every few
+         *  seconds, seen 2026-10-16), so one fault would fill the history in a single trip. */
+        const val REPEAT_WINDOW_MS = 10 * 60_000L
+
+        /** [history] with [e] on top, or the same list when [e] repeats a recent entry. */
+        fun withEntry(history: List<CcEntry>, e: CcEntry): List<CcEntry> {
+            val recent = history.any { it.text == e.text && e.atMs - it.atMs in 0 until REPEAT_WINDOW_MS }
+            return if (recent) history else (listOf(e) + history).take(MAX)
+        }
 
         /** One entry per line, `<epoch ms>\t<text>`; the text is ASCII without tabs or newlines. */
         fun encode(list: List<CcEntry>): String = list.joinToString("\n") { "${it.atMs}\t${it.text}" }
