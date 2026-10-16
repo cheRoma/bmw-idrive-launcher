@@ -12,6 +12,10 @@ import online.k73.bmwlauncher.ui.HomeActivity
 object LauncherForeground {
     @Volatile
     var isResumed: Boolean = false
+
+    /** When the ignition last came on; 0 = not since the process started. */
+    @Volatile
+    var lastIgnitionOnMs: Long = 0L
 }
 
 /**

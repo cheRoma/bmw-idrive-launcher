@@ -642,6 +642,23 @@ class HomeActivity : ComponentActivity() {
 
     override fun onPause() {
         LauncherForeground.isResumed = false
+        logWhoTookTheScreen()
         super.onPause()
+    }
+
+    /**
+     * Shortly after a start, name the app that covered us. The head unit restoring YouTube or VK
+     * Video over the launcher was only ever seen as `windowFocus=false`; this says who it was.
+     */
+    private fun logWhoTookTheScreen() {
+        val since = System.currentTimeMillis() - LauncherForeground.lastIgnitionOnMs
+        if (LauncherForeground.lastIgnitionOnMs == 0L || since > 120_000) return
+        lifecycleScope.launch(Dispatchers.IO) {
+            delay(1_500)
+            val top = runCatching {
+                RootShell().exec("dumpsys activity activities | grep -m1 -E 'topResumedActivity|mResumedActivity'").stdout
+            }.getOrNull()?.trim().orEmpty()
+            AppLog.d("HOME", "через ${since / 1000} с после старта экран занял: ${top.ifEmpty { "неизвестно (нет root)" }}")
+        }
     }
 }

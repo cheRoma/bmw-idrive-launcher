@@ -32,4 +32,15 @@ class IgnitionHomePolicy(private val debounceMs: Long = 5 * 60_000) {
         lastFiredMs = nowMs
         return true
     }
+
+    companion object {
+        /**
+         * The key going to OFF (from ACC or further) is when the head unit is about to sleep, and on
+         * waking it restores whatever was in front at that moment: YouTube over the launcher after a
+         * start, 29 s in on 2026-10-15. Going home here makes the launcher the thing it restores.
+         * ACC alone does not count, so a video watched parked with the key in ACC keeps playing.
+         */
+        fun keyOffGoesHome(previous: KeyPosition?, now: KeyPosition): Boolean =
+            now == KeyPosition.OFF && previous != null && previous != KeyPosition.OFF
+    }
 }

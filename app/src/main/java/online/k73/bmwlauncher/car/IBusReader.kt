@@ -229,6 +229,7 @@ class IBusReader(private val appContext: Context) {
     /** Mirror automation: off until the user turns it on (and only after the manual buttons work). */
     @Volatile var mirrorAutoEnabled = false
     private var lastIgnitionOn: Boolean? = null
+    private var lastKeyPosition: KeyPosition? = null
     private var lastMirrorActionMs = 0L
 
     /** Frames arrive on the serial IO thread, `sent` increments on the poll thread — hence the lock. */
@@ -533,7 +534,14 @@ class IBusReader(private val appContext: Context) {
      *  - ignition OFF edge → FOLD, under a brief wake lock so the send finishes before the unit sleeps.
      */
     private fun onSnapshotForMirrors(snap: BordData) {
-        val ign = when (snap.keyPosition ?: return) {
+        val key = snap.keyPosition ?: return
+        val prevKey = lastKeyPosition
+        lastKeyPosition = key
+        if (homeOnIgnition && IgnitionHomePolicy.keyOffGoesHome(prevKey, key)) {
+            AppLog.d("HOME", "ключ OFF → вывожу лаунчер, чтобы голова восстановила его, а не видео")
+            BringHome.now(appContext, "ключ OFF")
+        }
+        val ign = when (key) {
             KeyPosition.IGNITION, KeyPosition.START -> true
             else -> false
         }
@@ -541,6 +549,7 @@ class IBusReader(private val appContext: Context) {
         lastIgnitionOn = ign
         // Starting the car must land on the launcher, not on whatever the head unit restored from
         // before it slept. Checked before the mirror gates below: the two features are independent.
+        if (ign && prev != true) LauncherForeground.lastIgnitionOnMs = System.currentTimeMillis()
         if (homeOnIgnition &&
             ignitionHome.shouldOpenHome(ign, prev, System.currentTimeMillis(), LauncherForeground.isResumed)
         ) {

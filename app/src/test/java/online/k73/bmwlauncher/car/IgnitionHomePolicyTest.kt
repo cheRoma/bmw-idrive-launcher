@@ -44,4 +44,17 @@ class IgnitionHomePolicyTest {
         assertTrue(p.shouldOpenHome(true, previous = false, nowMs = 0, launcherAlreadyInFront = false))
         assertTrue(p.shouldOpenHome(true, previous = false, nowMs = 120_000, launcherAlreadyInFront = false))
     }
+
+    @Test fun the_key_going_off_goes_home() {
+        assertTrue(IgnitionHomePolicy.keyOffGoesHome(KeyPosition.ACC, KeyPosition.OFF))
+        assertTrue(IgnitionHomePolicy.keyOffGoesHome(KeyPosition.IGNITION, KeyPosition.OFF))
+    }
+
+    @Test fun acc_and_repeats_do_not_go_home() {
+        // Watching a video parked with the key in ACC must keep playing.
+        assertFalse(IgnitionHomePolicy.keyOffGoesHome(KeyPosition.IGNITION, KeyPosition.ACC))
+        assertFalse(IgnitionHomePolicy.keyOffGoesHome(KeyPosition.OFF, KeyPosition.OFF))
+        // First reading after a cold start: we do not know the key just went off.
+        assertFalse(IgnitionHomePolicy.keyOffGoesHome(null, KeyPosition.OFF))
+    }
 }
