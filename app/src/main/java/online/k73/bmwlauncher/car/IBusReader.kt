@@ -1,6 +1,7 @@
 package online.k73.bmwlauncher.car
 
 import kotlinx.coroutines.launch
+import online.k73.bmwlauncher.data.CheckControlStore
 import online.k73.bmwlauncher.data.OilStore
 
 import android.app.PendingIntent
@@ -65,7 +66,10 @@ class IBusReader(private val appContext: Context) {
     private val decoder = IBusDecoder(
         nowMs = { System.currentTimeMillis() },
         emit = { snap ->
-            if (snap.keyPosition == KeyPosition.OFF) finishTrip("key off")
+            if (snap.keyPosition == KeyPosition.OFF) {
+                finishTrip("key off")
+                checkControl.reset()
+            }
             _data.value = snap.copy(avgSpeedKmh = trip.averageKmh.roundToInt().takeIf { trip.hasData })
             onSnapshotForMirrors(snap)
             snap.odometerKm?.let { runCatching { OilStore.get(appContext).saveOdometer(it) } }
@@ -99,6 +103,7 @@ class IBusReader(private val appContext: Context) {
         onObcText = { prop, text ->
             if (lastObc.put(prop, text) != text && !ObcPoll.isNoisy(prop)) AppLog.d("OBC", "${ObcPoll.label(prop)} = '$text'")
         },
+        onCheckControl = { t -> checkControl.feed(t) },
         onSpeedSample = { kmh ->
             val now = System.currentTimeMillis()
             trip.onSpeed(kmh, now)
@@ -109,6 +114,19 @@ class IBusReader(private val appContext: Context) {
     )
 
     private val tripTracker = TripTracker()
+
+    // Cluster warnings → the banner and the «Сообщения» history. Untranslated texts are tagged in the
+    // log so the dictionary can be filled from real drives.
+    private val checkControl = CheckControlTracker(
+        onShow = { text ->
+            AppLog.d("CC", "show '$text'" + if (CheckControl.isKnown(text)) "" else " (no translation)")
+            runCatching { CheckControlStore.get(appContext).show(text) }
+        },
+        onClear = {
+            AppLog.d("CC", "clear")
+            runCatching { CheckControlStore.get(appContext).clear() }
+        },
+    )
 
     /**
      * Close the running trip (key off, or the cluster went quiet), store it, and send the logs while

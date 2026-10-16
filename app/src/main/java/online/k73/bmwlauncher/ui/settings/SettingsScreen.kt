@@ -63,6 +63,7 @@ fun SettingsScreen(
     onOpenProbe: () -> Unit = {},
     onMirrorAutoFold: (Boolean) -> Unit = {},
     onHomeOnIgnition: (Boolean) -> Unit = {},
+    onCheckControlBanner: (Boolean) -> Unit = {},
     /** True when SFA (sing-box) is on the unit — without it there is nothing to hand the profile to. */
     vpnAppInstalled: Boolean = false,
     onSendVpnProfile: () -> Unit = {},
@@ -135,6 +136,13 @@ fun SettingsScreen(
             subtitle = "Иначе после сна голова возвращает то, что было открыто в прошлый раз",
         ) {
             AmberSwitch(settings.homeOnIgnition, onHomeOnIgnition)
+        }
+        RowDivider()
+        SettingRow(
+            title = "Сообщения Check Control",
+            subtitle = "Плашка поверх экрана, пока на щитке горит предупреждение. История — в Борткомпьютере",
+        ) {
+            AmberSwitch(settings.checkControlBanner, onCheckControlBanner)
         }
         RowDivider()
         SettingRow(

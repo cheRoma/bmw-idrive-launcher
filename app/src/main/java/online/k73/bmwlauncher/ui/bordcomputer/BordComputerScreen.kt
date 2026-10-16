@@ -45,7 +45,7 @@ import online.k73.bmwlauncher.ui.theme.LocalLauncherColors
 import online.k73.bmwlauncher.ui.theme.pressScale
 
 @Composable
-fun BordComputerScreen(onBack: () -> Unit = {}, onTrips: () -> Unit = {}) {
+fun BordComputerScreen(onBack: () -> Unit = {}, onTrips: () -> Unit = {}, onMessages: () -> Unit = {}) {
     val appCtx = LocalContext.current.applicationContext
     // Shared process-wide reader (also feeds the home status bar) — already connected, no start/stop here.
     val reader = remember { IBusService.get(appCtx) }
@@ -82,6 +82,7 @@ fun BordComputerScreen(onBack: () -> Unit = {}, onTrips: () -> Unit = {}) {
         },
         onTogglePdc = { reader.setPdcCapture(!pdcOn) },
         onTrips = onTrips,
+        onMessages = onMessages,
         odometerKm = odo,
         oilLine = oil.summary(odo),
         oilStatus = odo?.let { oil.status(it) } ?: OilChange.Status.OK,
@@ -118,6 +119,7 @@ fun BordComputerContent(
     oilCanMark: Boolean = false,
     onOilChanged: () -> Unit = {},
     onTrips: () -> Unit = {},
+    onMessages: () -> Unit = {},
     odometerKm: Int? = data.odometerKm,
 ) {
     val c = LocalLauncherColors.current
@@ -130,6 +132,9 @@ fun BordComputerContent(
             }
             Spacer(Modifier.size(6.dp))
             androidx.compose.material3.Text("Борткомпьютер", color = c.text, fontFamily = Inter, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            // In the top bar, not the action row: a fifth pill there clipped «Записать парктроник».
+            ActionPill("Сообщения щитка", enabled = true, onClick = onMessages)
+            Spacer(Modifier.size(10.dp))
             StatusPill(data)
         }
 

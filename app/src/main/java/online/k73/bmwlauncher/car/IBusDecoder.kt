@@ -35,6 +35,8 @@ class IBusDecoder(
     /** Every IKE `0x18` speed frame, changed or not — distance integration needs the steady
      *  cruise samples too, which [emit] (fired only on change) would drop. */
     private val onSpeedSample: (Int) -> Unit = {},
+    /** Every Check Control text the check-control module sends the cluster, see [CheckControl]. */
+    private val onCheckControl: (CheckControl.Telegram) -> Unit = {},
 ) {
     private val buf = ArrayDeque<Int>()
     private var cur = BordData(connected = true)
@@ -118,6 +120,7 @@ class IBusDecoder(
         if (src == 0x00 && cmd == 0x7A && m.size >= 5) {
             next = next.copy(locked = (m[4] and 0x20) != 0)
         }
+        CheckControl.parse(m)?.let(onCheckControl)
         ObcPoll.lcmVoltageRaw(m)?.let { raw ->
             onLcmVoltage(raw)
             if (raw != next.voltageRaw) next = next.copy(voltageRaw = raw)

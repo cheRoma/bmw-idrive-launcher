@@ -64,6 +64,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import online.k73.bmwlauncher.ui.probe.BusProbeScreen
 import online.k73.bmwlauncher.ui.settings.SettingsScreen
 import online.k73.bmwlauncher.ui.theme.BmwLauncherTheme
@@ -481,7 +483,14 @@ class HomeActivity : ComponentActivity() {
                             )
                         }
                         composable("bordcomputer") {
-                            BordComputerScreen(onBack = { nav.popBackStack() }, onTrips = { nav.navigate("trips") })
+                            BordComputerScreen(
+                                onBack = { nav.popBackStack() },
+                                onTrips = { nav.navigate("trips") },
+                                onMessages = { nav.navigate("checkcontrol") },
+                            )
+                        }
+                        composable("checkcontrol") {
+                            online.k73.bmwlauncher.ui.checkcontrol.CheckControlScreen(onBack = { nav.popBackStack() })
                         }
                         composable("trips") {
                             online.k73.bmwlauncher.ui.trips.TripsScreen(onBack = { nav.popBackStack() })
@@ -526,6 +535,7 @@ class HomeActivity : ComponentActivity() {
                                 onOpenProbe = { nav.navigate("busprobe") },
                                 onMirrorAutoFold = { lifecycleScope.launch { store.setMirrorAutoFold(it) } },
                                 onHomeOnIgnition = { lifecycleScope.launch { store.setHomeOnIgnition(it) } },
+                                onCheckControlBanner = { lifecycleScope.launch { store.setCheckControlBanner(it) } },
                                 vpnAppInstalled = launcher.isInstalled(VpnProfile.SFA_PACKAGE),
                                 onSendVpnProfile = { sendVpnProfile() },
                                 remoteStatus = remoteStatus,
@@ -577,6 +587,21 @@ class HomeActivity : ComponentActivity() {
                                     musicVm.launchForeground(lifecycleScope)
                                 },
                                 onBack = { nav.popBackStack() },
+                            )
+                        }
+                    }
+                    // Cluster Check Control warning over every screen (see CheckControlBanner).
+                    if (settings.checkControlBanner) {
+                        val ccStore = remember { online.k73.bmwlauncher.data.CheckControlStore.get(applicationContext) }
+                        val ccActive by ccStore.active.collectAsState()
+                        var ccDismissed by remember { mutableStateOf<String?>(null) }
+                        // A new message, or the same one after it went away, shows again.
+                        LaunchedEffect(ccActive) { if (ccActive == null) ccDismissed = null }
+                        ccActive?.takeIf { it != ccDismissed }?.let { text ->
+                            online.k73.bmwlauncher.ui.checkcontrol.CheckControlBanner(
+                                text = text,
+                                onDismiss = { ccDismissed = text },
+                                modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter).padding(top = 14.dp),
                             )
                         }
                     }
