@@ -590,20 +590,38 @@ class HomeActivity : ComponentActivity() {
                             )
                         }
                     }
-                    // Cluster Check Control warning over every screen (see CheckControlBanner).
-                    if (settings.checkControlBanner) {
-                        val ccStore = remember { online.k73.bmwlauncher.data.CheckControlStore.get(applicationContext) }
-                        val ccActive by ccStore.active.collectAsState()
-                        var ccDismissed by remember { mutableStateOf<String?>(null) }
+                    // Cluster Check Control warning over every screen. Tapping the banner opens the full
+                    // card (meaning, steps, the dead bulb); a STOP-level message opens it by itself.
+                    val ccStore = remember { online.k73.bmwlauncher.data.CheckControlStore.get(applicationContext) }
+                    val ccActive by ccStore.active.collectAsState()
+                    val ccLamps by ccStore.faultyLamps.collectAsState()
+                    var ccDismissed by remember { mutableStateOf<String?>(null) }
+                    var ccOpen by remember { mutableStateOf<String?>(null) }
+                    LaunchedEffect(ccActive) {
                         // A new message, or the same one after it went away, shows again.
-                        LaunchedEffect(ccActive) { if (ccActive == null) ccDismissed = null }
+                        if (ccActive == null) ccDismissed = null
+                        ccActive?.takeIf { settings.checkControlBanner }?.let {
+                            if (online.k73.bmwlauncher.car.CheckControlGuide.severity(it) ==
+                                online.k73.bmwlauncher.car.CheckControlGuide.Severity.STOP) ccOpen = it
+                        }
+                    }
+                    if (settings.checkControlBanner && ccOpen == null) {
                         ccActive?.takeIf { it != ccDismissed }?.let { text ->
                             online.k73.bmwlauncher.ui.checkcontrol.CheckControlBanner(
                                 text = text,
+                                faultyLamps = online.k73.bmwlauncher.car.CheckControlGuide.faultyLampsFor(text, ccLamps),
+                                onOpen = { ccOpen = text },
                                 onDismiss = { ccDismissed = text },
                                 modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter).padding(top = 14.dp),
                             )
                         }
+                    }
+                    ccOpen?.let { text ->
+                        online.k73.bmwlauncher.ui.checkcontrol.CheckControlCard(
+                            text = text,
+                            faultyLamps = online.k73.bmwlauncher.car.CheckControlGuide.faultyLampsFor(text, ccLamps),
+                            onClose = { ccDismissed = text; ccOpen = null },
+                        )
                     }
                 }
             }

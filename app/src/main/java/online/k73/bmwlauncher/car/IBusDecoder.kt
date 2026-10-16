@@ -37,6 +37,8 @@ class IBusDecoder(
     private val onSpeedSample: (Int) -> Unit = {},
     /** Every Check Control text the check-control module sends the cluster, see [CheckControl]. */
     private val onCheckControl: (CheckControl.Telegram) -> Unit = {},
+    /** Every LCM lamp-status broadcast's faulty-bulb set (empty = all fine), see [Lamp]. */
+    private val onLampFaults: (Set<Lamp>) -> Unit = {},
 ) {
     private val buf = ArrayDeque<Int>()
     private var cur = BordData(connected = true)
@@ -121,6 +123,7 @@ class IBusDecoder(
             next = next.copy(locked = (m[4] and 0x20) != 0)
         }
         CheckControl.parse(m)?.let(onCheckControl)
+        Lamp.faults(m)?.let(onLampFaults)
         ObcPoll.lcmVoltageRaw(m)?.let { raw ->
             onLcmVoltage(raw)
             if (raw != next.voltageRaw) next = next.copy(voltageRaw = raw)

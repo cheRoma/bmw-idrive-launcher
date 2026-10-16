@@ -104,6 +104,13 @@ class IBusReader(private val appContext: Context) {
             if (lastObc.put(prop, text) != text && !ObcPoll.isNoisy(prop)) AppLog.d("OBC", "${ObcPoll.label(prop)} = '$text'")
         },
         onCheckControl = { t -> checkControl.feed(t) },
+        onLampFaults = { lamps ->
+            val store = runCatching { CheckControlStore.get(appContext) }.getOrNull()
+            if (store != null && store.faultyLamps.value != lamps) {
+                AppLog.d("LAMP", if (lamps.isEmpty()) "all ok" else "faulty: " + lamps.joinToString { it.name })
+                store.setFaultyLamps(lamps)
+            }
+        },
         onSpeedSample = { kmh ->
             val now = System.currentTimeMillis()
             trip.onSpeed(kmh, now)

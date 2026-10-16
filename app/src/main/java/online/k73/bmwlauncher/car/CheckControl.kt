@@ -58,6 +58,9 @@ object CheckControl {
      *  («CHECK LOWBEAMS», «CHECK LOW BEAM LIGHTS», «TRANS. FAILSAFE PROG»), the table lists each once. */
     private fun key(t: String) = t.filter { it.isLetterOrDigit() }
 
+    /** Every Russian title the table can produce, for the guide-coverage test. */
+    internal val titles: Set<String> get() = RU.values.toSet()
+
     // «LIMIT 6 KM/H» (the OBC limit), «MAX. 60 KM/H» / «MAX. 35 MPH» (winter tyres) — the number varies.
     private val SPEED = Regex("(?:LIMIT|MAX\\.?) ?(\\d+) ?(KM/H|MPH)")
     private fun unit(u: String) = if (u == "MPH") "миль/ч" else "км/ч"

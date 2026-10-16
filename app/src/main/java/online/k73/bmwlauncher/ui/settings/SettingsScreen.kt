@@ -140,7 +140,7 @@ fun SettingsScreen(
         RowDivider()
         SettingRow(
             title = "Сообщения Check Control",
-            subtitle = "Плашка поверх экрана, пока на щитке горит предупреждение. История — в Борткомпьютере",
+            subtitle = "Плашка поверх экрана, пока на щитке горит предупреждение, а при опасных сразу карточка. История в Борткомпьютере",
         ) {
             AmberSwitch(settings.checkControlBanner, onCheckControlBanner)
         }

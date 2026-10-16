@@ -21,6 +21,15 @@ class CheckControlStore private constructor(context: Context) {
     private val _active = MutableStateFlow<String?>(null)
     val active: StateFlow<String?> = _active
 
+    // Dead bulbs as the light module last reported them; kept across key-off so a parked car still
+    // says which one, until the module reports otherwise.
+    private val _faultyLamps = MutableStateFlow<Set<online.k73.bmwlauncher.car.Lamp>>(emptySet())
+    val faultyLamps: StateFlow<Set<online.k73.bmwlauncher.car.Lamp>> = _faultyLamps
+
+    fun setFaultyLamps(lamps: Set<online.k73.bmwlauncher.car.Lamp>) {
+        _faultyLamps.value = lamps
+    }
+
     @Synchronized
     fun show(text: String, nowMs: Long = System.currentTimeMillis()) {
         _active.value = text

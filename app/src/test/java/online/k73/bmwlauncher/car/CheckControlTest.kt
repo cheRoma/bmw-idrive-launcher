@@ -69,6 +69,22 @@ class CheckControlTest {
         assertEquals(2, clears)
     }
 
+    @Test fun every_message_has_a_guide() {
+        assertEquals(emptyList<String>(), CheckControl.titles.filter { CheckControlGuide.forTitle(it) == null })
+    }
+
+    @Test fun severity_and_lamps() {
+        assertEquals(CheckControlGuide.Severity.STOP, CheckControlGuide.severity("STOP!ENGINE OILPRESS"))
+        assertEquals(CheckControlGuide.Severity.SERVICE, CheckControlGuide.severity("CHECK BRAKE LIGHTS"))
+        assertEquals(CheckControlGuide.Severity.INFO, CheckControlGuide.severity("WASHER FLUID LOW"))
+        assertEquals(CheckControlGuide.Severity.INFO, CheckControlGuide.severity("SOMETHING NEW"))
+        val faults = setOf(Lamp.BRAKE_LEFT, Lamp.REAR_LEFT, Lamp.PLATE)
+        assertEquals(listOf("левый стоп-сигнал", "левый задний габарит"), CheckControlGuide.faultyLampsFor("CHECK BRAKE LIGHTS", faults))
+        assertEquals(emptyList<String>(), CheckControlGuide.faultyLampsFor("DOOR OPEN", faults))
+        assertEquals(true, CheckControlGuide.hint(faults) != null)
+        assertNull(CheckControlGuide.hint(setOf(Lamp.BRAKE_LEFT, Lamp.REAR_RIGHT)))
+    }
+
     @Test fun store_round_trips() {
         val list = listOf(CcEntry(1_792_086_720_436, "CHECK BRAKE LIGHTS"), CcEntry(5, "LIMIT 6 KM/H"))
         assertEquals(list, CheckControlStore.decode(CheckControlStore.encode(list)))

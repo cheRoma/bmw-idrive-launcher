@@ -13,6 +13,7 @@ import com.android.resources.Density
 import com.android.resources.ScreenOrientation
 import online.k73.bmwlauncher.data.CcEntry
 import online.k73.bmwlauncher.ui.checkcontrol.CheckControlBanner
+import online.k73.bmwlauncher.ui.checkcontrol.CheckControlCard
 import online.k73.bmwlauncher.ui.checkcontrol.CheckControlContent
 import online.k73.bmwlauncher.ui.theme.BmwLauncherTheme
 import online.k73.bmwlauncher.ui.theme.LocalLauncherColors
@@ -38,11 +39,26 @@ class CheckControlScreenshotTest {
             BmwLauncherTheme(isNight = true) {
                 Box(Modifier.fillMaxSize().background(LocalLauncherColors.current.background)) {
                     CheckControlBanner(
-                        "CHECK BRAKE LIGHTS", onDismiss = {},
+                        "CHECK BRAKE LIGHTS", onOpen = {}, onDismiss = {},
+                        faultyLamps = listOf("левый стоп-сигнал", "левый задний габарит"),
                         modifier = Modifier.align(Alignment.TopCenter).padding(top = 14.dp),
                     )
                 }
             }
+        }
+    }
+
+    @Test fun card_brake_lights() {
+        paparazzi.snapshot {
+            BmwLauncherTheme(isNight = true) {
+                CheckControlCard("CHECK BRAKE LIGHTS", listOf("левый стоп-сигнал", "левый задний габарит"), onClose = {})
+            }
+        }
+    }
+
+    @Test fun card_oil_pressure() {
+        paparazzi.snapshot {
+            BmwLauncherTheme(isNight = true) { CheckControlCard("STOP!ENGINE OILPRESS", emptyList(), onClose = {}) }
         }
     }
 
