@@ -2,12 +2,12 @@
 
 **English** · [Русский](README.ru.md)
 
-**A custom Android home-screen launcher that turns a cheap aftermarket head unit into a premium, BMW-iDrive-style car interface.**
+**An Android home-screen launcher for a BMW X5 E53, built with Kotlin and Jetpack Compose.**
 
-Built for a **2005 BMW X5 (E53)** running an **XTRONS** Android head unit, this launcher replaces the sluggish factory desktop with a fast, touch-first UI inspired by modern **iDrive**: a 3D tile carousel over a **live map background**, an instrument-amber accent on near-black graphite, a now-playing screen wired to **Yandex Music**, and a **from-scratch on-board computer that reads the car's BMW I-Bus directly over USB** (it also folds the mirrors) — plus in-app OTA updates, one-tap reboot, and diagnostics that watch the launcher and repair it. All in **Kotlin + Jetpack Compose**, screenshot-tested, no root required.
+Built for a **2005 BMW X5 (E53)** with an **XTRONS** head unit. It has an iDrive-style carousel over a live map, media controls and an on-board computer that reads the car's **I-Bus over USB**. The same connection handles mirror folding and instrument-cluster warnings. Updates arrive over the air; diagnostics can recover a black screen. No root required.
 
 <p align="center">
-  <img src="screenshots/home.png" alt="Home carousel" width="88%">
+  <img src="screenshots/portfolio/home.png" alt="Home carousel" width="88%">
 </p>
 
 ---
@@ -15,7 +15,6 @@ Built for a **2005 BMW X5 (E53)** running an **XTRONS** Android head unit, this 
 ## Table of contents
 
 - [Why](#why)
-- [Promo video](#promo-video)
 - [Screenshots](#screenshots)
 - [Features](#features)
 - [The car & the head unit](#the-car--the-head-unit)
@@ -49,23 +48,17 @@ This started as a from-scratch replacement whose main job was to **autostart a p
 
 ---
 
-## Promo video
-
-[![BMW iDrive Launcher promo, short loop](screenshots/promo-ignition.gif)](https://github.com/cheRoma/bmw-idrive-launcher/releases/download/v1.6.46/bmw-idrive-launcher-promo.mp4)
-
-A 36-second promo cut from the app's real screens: the head unit lights up in the X5, then the carousel, the Yandex Music player, the on-board computer and the settings. [Watch the MP4](https://github.com/cheRoma/bmw-idrive-launcher/releases/download/v1.6.46/bmw-idrive-launcher-promo.mp4) (1080p, 16 MB). The cabin and the head unit in the opening shot are generated; every screen is the real UI.
-
 ## Screenshots
 
-> These are the app's actual rendered UI, captured by the [Paparazzi](https://github.com/cashapp/paparazzi) screenshot tests at the head unit's native 1280×720.
+> Portfolio copies of the app's rendered screens. Third-party app names and selected icons have been redacted. The original [Paparazzi](https://github.com/cashapp/paparazzi) test images remain separate from these presentation assets.
 
 | Home — iDrive 3D carousel (over a live map) | Music — player v4 (cover bg + calm seek bar) |
 |---|---|
-| ![Home](screenshots/home.png) | ![Music player v4](screenshots/music-player-v4.png) |
+| ![Home](screenshots/portfolio/home.png) | ![Music player v4](screenshots/portfolio/music.png) |
 
 | Apps | Settings |
 |---|---|
-| ![Apps](screenshots/apps.png) | ![Settings](screenshots/settings.png) |
+| ![Apps](screenshots/portfolio/apps.png) | ![Settings](screenshots/portfolio/settings.png) |
 
 ---
 
@@ -85,13 +78,13 @@ A 36-second promo cut from the app's real screens: the head unit lights up in th
 - Tiles are **proxied through our own host** (the head unit's ISP can't reach the tile CDN directly, but it can always reach our server), and a dark scrim keeps the tiles/clock legible over the map. Gestures are disabled — it's a backdrop, not a map you touch.
 - **One map view for the whole process**, composed below the navigation graph rather than inside the home screen: leaving the carousel used to destroy its GL context and returning built a new one, dozens of times per drive (see [field notes](#field-notes--problems-solved)).
 
-### Music — Yandex Music now-playing (player screen v4)
-- Controls **Yandex Music** via the Android `MediaSession` / `MediaController` framework (no reverse-engineering) using a `NotificationListenerService`.
+### Music and playback
+- Controls the supported streaming app through Android `MediaSession` / `MediaController`, using a `NotificationListenerService`. Cold-start and library access are app-specific; this is not a universal streaming-service client.
 - **v4 player screen:** the **album cover fills the whole background** (scrim + vignette keep text legible); a **calm amber seek bar** shows progress. Transport row is *shuffle · prev · play/pause · next · like*, with a tap-and-drag seek. *(An earlier animated "equalizer" was dropped: the head-unit ROM blocks audio capture, so any analyzer was necessarily synthetic and read as fake.)*
-- **Cold start into a fresh «Моя волна»:** if nothing is playing when you open Music, the launcher opens Yandex through the `yandexmusic://radio/user/onyourwave?play=true` link, waits for the wave to start, and brings you back to the now-playing screen. Yandex's own screen shows for 3 to 4 seconds. A media-button PLAY would be quieter, but it resumes whatever queue was left on the head unit, not your wave.
+- **Cold start into a fresh recommendation queue:** if nothing is playing, the launcher opens the streaming app through `yandexmusic://radio/user/onyourwave?play=true`, waits for playback, then returns to its own player. The external app is visible for 3 to 4 seconds. Sending PLAY alone resumes the queue left on the head unit instead.
 
-### Video — YouTube behind a per-app VPN, plus ivi
-- A **YouTube** tile that opens the app, and an **ivi** tile beside it (it tries the phone build and the Android-TV one and launches whichever is installed). YouTube is throttled/blocked in Russia, so it runs behind a **DPI-bypassing VPN** (VLESS + Reality via [sing-box](https://sing-box.sagernet.org/)) configured as an **always-on, _per-app_ `VpnService`** — only YouTube's traffic egresses through the tunnel; everything else (Yandex, navigation) stays direct. No runtime root needed. Design: [`youtube-vpn-design.md`](docs/superpowers/specs/2026-07-06-youtube-vpn-design.md).
+### Video apps and per-app networking
+- Separate tiles open **YouTube** and the configured video app. YouTube can use an always-on, per-app `VpnService` through [sing-box](https://sing-box.sagernet.org/) (VLESS + Reality). Only its traffic uses the tunnel; music and navigation connect directly. No runtime root needed. Design: [`youtube-vpn-design.md`](docs/superpowers/specs/2026-07-06-youtube-vpn-design.md).
 
 ### On-board computer — reads the car's I-Bus directly
 - A **from-scratch trip computer**: the launcher talks to the car's **BMW I-Bus** over the Resler **CP210x USB-serial** adapter (9600 8E1, via `usb-serial-for-android`) and decodes the IKE instrument-cluster broadcasts itself — **speed, RPM, coolant & outside temperature, ignition** — and shows them on a native screen in the launcher's own style.
@@ -195,7 +188,7 @@ Developing on this class of unit has one nasty gotcha: the normal *"tap Build nu
 
 It took a full evening to reverse-engineer, so it's written up as a standalone guide for anyone with a **XTRONS / Microntek / HCT / MTCE** unit:
 
-📄 **[Enabling ADB / Developer Options on Chinese Android head units (`adbon`)](docs/ENABLING-ADB-HCT-HEADUNITS.md)**
+📄 **[Enabling ADB / Developer Options on aftermarket Android head units (`adbon`)](docs/ENABLING-ADB-HCT-HEADUNITS.md)**
 
 ---
 
@@ -304,7 +297,7 @@ Then set it as the default Home app (Android Settings → Default apps → Home 
 ## Testing
 
 - **Unit tests** (JUnit4 + Robolectric) cover the pure logic: carousel geometry, clock/date formatting, playback mapping, theme resolution, the update checker, and the autostart state machine.
-- **Screenshot tests** ([Paparazzi](https://github.com/cashapp/paparazzi)) render each screen at the head unit's 1280×720 and diff against committed goldens, so a visual regression fails CI. The goldens double as the screenshots in this README.
+- **Screenshot tests** ([Paparazzi](https://github.com/cashapp/paparazzi)) render each screen at the head unit's 1280×720 and diff against committed goldens, so a visual regression fails CI. This README uses separate, redacted portfolio copies.
 - Two rules learned the hard way: `testDebugUnitTest` **records** goldens, only `verifyPaparazziDebug` **checks** them — so "tests pass" is not "screens unchanged"; and any non-deterministic value on a screen (a live clock) must be injectable, or its golden can never verify again.
 
 ```bash
@@ -331,39 +324,39 @@ The app self-updates so improvements ship without a flash drive:
 
 | Version | Highlights |
 |---|---|
-| **2.2.2** | **The launcher, not YouTube, after a start.** On waking, the head unit appears to bring back whatever was on screen when it went to sleep: half a minute after a start it sometimes covered the launcher with YouTube or VK Video. Now the launcher goes to its home screen by itself when the key reaches OFF, so that is what the head unit restores. ACC is left alone, so a video watched parked with the key in ACC keeps playing. For two minutes after a start the launcher logs which app took over the screen |
+| **2.2.2** | **Restore the launcher after a start.** The head unit could restore a video app over the launcher after waking. The launcher now returns home when the key reaches OFF, so the unit restores that screen. Playback in ACC is unaffected. For two minutes after a start, diagnostics log which app takes the foreground |
 | **2.2.1** | The same cluster message goes into the history at most once every 10 minutes. The cluster cycles through its warnings («CHECK BRAKE LIGHTS» and «CHECK REAR LIGHTS» swap every few seconds), so a single fault used to fill the history within one trip. Checked on the car on 16 October: the light module named the left brake light and left tail light, same as the day before |
 | **2.2.0** | **What to do, and which bulb.** Tapping the banner opens a card for the message: how urgent it is (in colour: «Остановитесь», «Доехать до сервиса», «Можно ехать»), what it means, and 2 to 4 steps taken from the 2002 and 2005 E53 owner's manuals. Dangerous messages (oil pressure, overheating, brake fluid, a flat tyre) open the card full screen on their own. The light module reports on the I-Bus which bulb is out (`D0 .. BF 5B`, bit layout from kmalinich/node-bmw-client), and the launcher now shows it: «Не горит: левый стоп-сигнал, левый задний габарит». The module tells left from right for brake lights, rear tail lights and low beams. When the brake and tail light on the same side are both out, the card suggests starting with the lamp's connector and circuit-board contacts, because two bulbs rarely fail at once. That is what this car showed on 15 October: left brake and left tail light out |
 | **2.1.0** | **Cluster warnings on the head unit.** The Check Control module sends every warning to the cluster as plain text on the I-Bus (`30 .. 80 1A`), and now the launcher reads it too. While a message is lit on the cluster, a banner sits over every launcher screen: «Проверьте стоп-сигналы», with the original «CHECK BRAKE LIGHTS» in small type below. A tap hides it. The «Сообщения щитка» screen opens from the on-board computer and keeps the last 100 messages with date and time. Settings can switch the banner off; the history keeps recording either way. The launcher translates about 75 E53, E39 and E38 texts into Russian. The same message is spelled differently across years and markets, so it compares texts without spaces and dots. An unknown text appears as is and gets flagged in the log. The launcher only reads the bus, and it makes no sound of its own, since the cluster already gongs |
 | **2.0.1** | The on-board computer tile is labelled **«БК»**: «Борткомпьютер» did not fit the tile and was clipped to «Борткомпьют». The screen itself keeps its full title |
 | **2.0.0** | **A real on-board computer.** Consumption, range and battery voltage on one screen with rpm, coolant, outside temperature and the odometer, laid out as two rows of four because the 432 dp panel cannot also fit a big speed (the speedometer already shows it). The values were checked on the car: the cluster answered 18.2 L/100 and 319 km, the same as it showed. A **trip log** with its own screen, an **oil-change countdown** with a reminder in the home ribbon, a **flat-battery warning**, and logs that **upload themselves after every trip**. Distance is now integrated from every speed frame rather than only from changed ones, so a steady cruise no longer drags the average speed down. Test builds 1.6.50–1.6.52 led up to it: OBC polling, the oil countdown, the voltage byte |
-| **1.6.48–1.6.49** | **Music starts a fresh «Моя волна» again.** Yandex Music 2026.09.5 auto-updated on the unit, disabled its old `MusicBrowserService` and moved to a media3 `Media3LibraryService`. The new service rejects third-party browse clients too, so the headless start never had a way in. A media-button PLAY does wake a killed Yandex now, but it resumes the queue left on the head unit: tracks from an old drive instead of the wave the phone was playing, which sounded like somebody else's taste. Cold start now opens Yandex through `yandexmusic://radio/user/onyourwave?play=true`, the same thing the big yellow button does, lets it start the wave on its own for up to 6 seconds, and only then falls back to PLAY. Checked on the car with Yandex force-stopped: the wave started in 3.6 s with a new queue, and the launcher came back on top. Two other links (`rotor/user:onyourwave`, `wave`) did nothing. `YandexBrowserStarter` is gone, since neither service lets it in |
-| **1.6.47** | **The navigator is chosen in Settings** — the НАВИГАТОР tile opens Яндекс Навигатор or Yango Maps, and the choice can be flipped mid-trip instead of in a new build. Yango carries the same maps and traffic without the ads, but it is Яндекс Карты with a navigation mode rather than the driver-first Навигатор, and only driving both will settle which is better. A tile pointed at an app that was never installed now says so in the log instead of swallowing the tap |
+| **1.6.48–1.6.49** | **Fresh music queue on cold start.** The streaming app's 2026.09.5 update replaced `MusicBrowserService` with `Media3LibraryService`; both reject third-party browse clients. Cold start now uses `yandexmusic://radio/user/onyourwave?play=true`, allows up to 6 seconds, then falls back to PLAY. Tested from a force-stopped state: playback started in 3.6 seconds and the launcher returned to the foreground. The unused `YandexBrowserStarter` was removed |
+| **1.6.47** | **Navigation app chosen in Settings.** Switch between the two supported navigation apps without rebuilding. A tile targeting an uninstalled app now records the failure in the log |
 | **1.6.46** | **The second map turned out to be a second Activity** — diagnostics reported `created=2 destroyed=0`, and the `RememberObserver` added in 1.6.43 was not at fault: two `HomeActivity` instances were alive, each owning a map view. With the accessibility service off, `BringHome` started `HomeActivity` by class with `NEW_TASK`, and an explicit component start does not land in the home task — the system keeps the instance it launched there and ours sits beside it in a task of its own. A HOME intent does land there, so the existing instance gets `onNewIntent` instead. Pinned to our package so a moment when we are not the default HOME cannot hand the driver somebody else's launcher |
-| **1.6.44–1.6.45** | **A movie tile next to YouTube** — Кинопоиск first, already installed and signed in on the unit but reachable only through the app drawer. One version later VK Видео took its place: the WiFi the car parks on egresses from Tallinn, so Russian services see a foreign datacentre IP and Кинопоиск refuses to load its catalogue at all, while VK Видео survives that network. Both were checked on the unit before the switch. Its icon is a circle-play, because the rounded-rect one was indistinguishable from the YouTube tile at a glance, which is the only kind of look a driver gets |
+| **1.6.44–1.6.45** | **A video tile next to YouTube.** Added a shortcut, then switched to an app that worked on the head unit's network. Its circle-play icon is easier to distinguish from the YouTube tile at a glance |
 | **1.6.42–1.6.43** | **Starting the car lands on the launcher** — the head unit restores whatever was open before it slept (YouTube, the navigator), so the ignition edge from our own I-Bus reader now presses Home through the accessibility service, twice and spaced out, because the ROM finishes its own restore a beat later. Off-by-switch, never while the engine is already running, and never when the launcher is already in front. Plus a **leaked GL context** fixed: a map view built inside `remember` was kept alive when Compose abandoned the composition |
 | **1.6.41** | **The launcher carries its own reverse tunnel** — remote support no longer depends on Termux holding an `autossh` session that the low-memory killer took down. It exposes the device's adb port and a four-action control endpoint of the launcher's own, both loopback-only and reachable solely through the tunnel; a Settings switch turns it off and shows the live state. Public release APKs are built without the credentials |
 | **1.6.40** | **VPN profile handed over from Settings** — a «Передать» button fires sing-box's own `sing-box://import-remote-profile` link at SFA with the remote profile URL already filled in, so switching VPN servers no longer means typing a long address on the head unit's on-screen keyboard. The profile is remote, so later server changes need no visit to the car at all |
 | **1.6.39** | **One map for the whole process** — the MapLibre view moved out of the home destination and under the NavHost, so leaving the carousel no longer destroys its GL context and returning no longer builds a new one (it used to happen dozens of times per drive, and the first captured black screen landed right after such a rebuild). Screenshot goldens made honest again: the Settings one was missing two rows, and the Music ones rendered a live clock, so they could never verify |
 | **1.6.38** | **Black screen heals itself** — the detector now escalates through drop-the-map → recreate the activity → restart the process, and records which step brought the pixels back; its report gained a logcat tail, a GPU-bypassing software draw of the same window, a frame counter and the map's GL-context churn, so one occurrence is enough to name the broken layer |
-| **1.6.32–1.6.37** | **Real mirror fold codes** (0x39/0x3A — the earlier guess drove the *windows*), folding tied to the ignition rather than the door lock, a **bus probe** screen for trying telegrams safely, and an **ivi** tile beside YouTube |
+| **1.6.32–1.6.37** | **Real mirror fold codes** (0x39/0x3A — the earlier guess drove the *windows*), folding tied to the ignition rather than the door lock, a **bus probe** screen for trying telegrams safely, and a video-app tile beside YouTube |
 | **1.6.31** | **Durable black-screen detector** — samples the window's own pixels, so the blank-window-with-a-live-main-thread failure finally leaves evidence even when the car is offline |
 | **1.6.21–1.6.30** | HOME key always returns to the carousel and Back on the carousel stays put; PDC capture with live counters; **mirror automation** (first attempt); I-Bus **reconnects itself** after a USB drop; read-only **bus recorder** with timestamped frames |
 | **1.6.15–1.6.20** | Denser & bigger iDrive carousel; **reliable Back on every screen** (+ the hardware Back key, the only real panel key); **panel "Music" button → our own player** via an AccessibilityService redirect; **trip average speed** in the on-board computer (with reset); **PDC capture** — polls the parking module on the I-Bus to decode its distances |
-| **1.6.11–1.6.14** | Map rendered as a **TextureView** (fixes the black home screen after an ACC sleep/wake); one-tap **clear of the latched OBC speed limit** (the >6 km/h gong); hardware key-event logging; headless Yandex start (no app flash) |
+| **1.6.11–1.6.14** | Map rendered as a **TextureView** (fixes the black home screen after an ACC sleep/wake); one-tap **clear of the latched OBC speed limit** (the >6 km/h gong); hardware key-event logging; headless music start (no app flash) |
 | **1.6.10** | On-board computer logs one example of **every distinct I-Bus message type** — groundwork for fuel / consumption / trip averages |
 | **1.6.9** | **Live outside temperature** on the home status bar (replaces the X5 emblem); one shared process-wide I-Bus reader |
 | **1.6.6–1.6.8** | **Own on-board computer** — reads the BMW I-Bus over the CP210x USB adapter (speed · RPM · coolant · outside temp); i-Bus app autostart removed; map tiles proxied through our own host |
-| **1.6.3–1.6.7** | **Live map home background** — MapLibre GL + OpenFreeMap, self-styled dark/amber (dropped Yandex MapKit, whose proprietary style format never applied) |
+| **1.6.3–1.6.7** | **Live map home background** with MapLibre GL + OpenFreeMap and a dark/amber style, replacing a provider whose style settings failed to apply |
 | **1.6.0–1.6.2** | Audio-reactive equalizer experiments → **removed** for a calm seek bar (ROM blocks audio capture); reboot-durable ANR reports; gray-screen root-cause fixes |
 | **1.5.7** | **YouTube tile** (opens behind a per-app DPI-bypassing VPN, provisioned on-device) |
 | **1.5.6** | **Player screen v4** — album cover background + **live amber equalizer** progress, new shuffle·prev·play·next·like transport |
-| **1.5.5** | Reliable Yandex **cold-start** — auto-wake on entry, bounded nudges, foreground fallback |
+| **1.5.5** | Reliable music **cold-start** with auto-wake on entry, bounded retries and a foreground fallback |
 | **1.5.0–1.5.4** | In-app diagnostics (event log, crash/ANR capture, one-tap upload), cold-start polish, grey-empty-Music fix |
 | **1.4.x** | **Claude-Design redesign** — filled icon-centric carousel cards, envelope album art, working back navigation, reliable "make default launcher", darker palette + Inter typography, triple press-feedback |
 | **1.3.x** | iDrive 3D carousel home + on-device tuning (centering on real width, size, contrast) |
 | **1.2.x** | Adaptive launcher icon, default-launcher setting, Music seek + like, i-Bus flash removal |
-| **1.1.x** | Music now-playing (Yandex `MediaSession`) |
+| **1.1.x** | Music now-playing through Android `MediaSession` |
 | **1.0.x** | Skeleton launcher, non-root reboot, OTA self-update, autostart |
 
 ---
@@ -377,26 +370,26 @@ The app self-updates so improvements ship without a flash drive:
 
 *(Done since the roadmap was first written: live map background, our own I-Bus on-board computer, outside temperature in the ribbon, trip average speed, mirror automation, self-repairing diagnostics; in 2.0 consumption and range, battery voltage, oil-change countdown, trip log.)*
 
-**What will not happen:** in-launcher **playlist browsing**. Tested on the car: Yandex Music rejects us
-as a third-party browse client (`onConnectionFailed`). That held for the old `MusicBrowserService` and
-holds for `Media3LibraryService`, which replaced it in Yandex 2026.09. Binding only wakes the process;
-the catalogue is never handed over. So "Плейлисты" stays a button that opens the
-Yandex app; transport control and now-playing over `MediaSession` work in full.
+**Playlist browsing stays in the streaming app.** The supported app rejects third-party browse
+clients (`onConnectionFailed`), both through the old `MusicBrowserService` and through
+`Media3LibraryService`, introduced in its 2026.09 update. Binding wakes the process but provides
+no catalogue. The playlist button opens the external app; transport controls and now-playing
+continue to work through `MediaSession`.
 
 ---
 
 ## Field notes — problems solved
 
-Developing a launcher for a Chinese Qualcomm head unit, blind, on a real daily-driven car surfaces problems you won't find in the docs. The notable ones:
+Developing a launcher on a daily-driven car exposed several hardware and Android issues:
 
 - **Recovering the unit from a boot-loop brick.** A one-time root experiment flashed a Magisk-patched `boot_b` that kernel-panics on this engineering ROM → an endless *logo → black screen* loop that A/B auto-rollback never escaped. The vendor's recovery steps (a "reset button" menu, a USB stick) are for Rockchip units and do nothing on Qualcomm. The real fix: reach **fastboot over the 4-pin USB‑OTG lead** (see below) and re-flash the unit's own stock boot image (`fastboot flash boot_b …`). Data, apps and settings all survived (userdata is shared across A/B slots).
 - **Which USB port is which.** These units expose three USB channels: a **6-pin lead = USB2 + USB3 (host-only**, for flash drives) and a **4-pin lead = USB_OTG** (the service port). Only the OTG lead enumerates as **fastboot / EDL 9008** on a PC — every recovery attempt on the host ports sees nothing. Reset-power on the OTG lead lands in *fastboot* (`Android Bootloader Interface`, 18D1:D00D), not EDL.
 - **The panel hardware buttons can't be remapped — but can be redirected.** A live `getevent` capture proved only **«Back» sends a real key code** (`KEY_BACK`); every other panel button is hard-wired inside the MCU to `startActivity` a stock Microntek app, emitting no interceptable key event. So we can't hook the key — instead an **AccessibilityService** catches the stock app coming to the foreground and jumps to our matching screen (e.g. the panel "Music" button now opens our player).
 - **Tiny tap targets don't register on this LCD.** Small back chevrons near the very top edge were frequently missed; enlarging them and adding a hardware `BackHandler` on every screen fixed both the touch and the physical Back key.
-- **The grey player.** Yandex Music exposes *several* `MediaSession`s — an idle blank one and the real one — and binding the wrong one drew an empty player over live music.
+- **The grey player.** The streaming app exposes several `MediaSession`s, including an idle one. Binding the wrong session drew an empty player while music was playing.
 - **The black home screen, in three acts.** First blamed on MapLibre's default GL `SurfaceView` losing its buffer across the ACC sleep/wake cycle → switched to a `TextureView`, which helped but didn't cure it. Since it left no trace, the next step was a **detector that samples the window's own pixels**; its first capture rewrote the diagnosis — *zero* bright pixels, so the clock and tiles were gone too, not just the map, with the main thread responsive: a failure below the UI, not in it. And it struck half a second after the map rebuilt its GL context, which happened on **every return to the carousel**. Hence the fix: one map view for the whole process, composed below the navigation graph — plus a self-repair ladder for the day it happens anyway.
 - **The phantom >6 km/h gong.** The removed OEM app had latched a native OBC speed limit into the instrument cluster; a single I-Bus write (the exact telegram, decompiled from that app) clears it.
-- **YouTube throttling in the region.** Routed only YouTube through an always-on per-app `VpnService` (VLESS/Reality) — no root, everything else stays direct.
+- **Per-app routing.** Routed YouTube through an always-on `VpnService` (VLESS/Reality), with other apps connecting directly and no root requirement.
 - **The parktronic beeps late by design.** The E53 PDC stays silent until you're close. The distances are on the I-Bus (device `0x60`, answered on request) — capturing them lets us build an earlier, graduated alert.
 
 ---
@@ -405,7 +398,7 @@ Developing a launcher for a Chinese Qualcomm head unit, blind, on a real daily-d
 
 - **Non-root by design.** Some things a rooted launcher could do (fully silent installs, forcing default HOME) are done the polite, user-confirmed way instead.
 - The head unit's LCD lifts near-black toward a lit blue-grey — full-dark screens photograph bluer than they render.
-- Yandex Music integration is limited to what its `MediaSession` exposes (transport + now-playing are guaranteed; library browsing is not).
+- Music integration is limited to the supported app's `MediaSession`: transport controls and now-playing work; library browsing does not.
 - **No _persistent_ on-device root.** The ROM ships no `su`/Magisk, so ADB root exists only over a live connection — see the [`adbon` guide](docs/ENABLING-ADB-HCT-HEADUNITS.md). Permanent root *is* reachable (the bootloader is unlocked and the 4-pin OTG lead enumerates as fastboot), but the one attempt bricked the unit into a boot-loop, and after recovering it the choice was to stay non-root. This is why the YouTube VPN uses an always-on `VpnService` rather than a root-managed tunnel.
 
 ---
